@@ -1,3 +1,7 @@
+import LocationPickerModal from '@/components/LocationPickerModal'
+import { images } from '@/constants'
+import { useLocationStore } from '@/store/location.store'
+import { useRouter } from 'expo-router'
 import React, { useState } from 'react'
 import {
   Alert,
@@ -12,10 +16,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import { useRouter } from 'expo-router'
-import { SavedAddress, useLocationStore } from '@/store/location.store'
-import LocationPickerModal from '@/components/LocationPickerModal'
-import { images } from '@/constants'
 
 export default function SavedAddressesScreen() {
   const router = useRouter()
@@ -231,16 +231,14 @@ export default function SavedAddressesScreen() {
                 <TouchableOpacity
                   key={lbl}
                   onPress={() => setSelectedLabel(lbl)}
-                  className={`flex-1 py-2.5 rounded-full items-center border-2 ${
-                    selectedLabel === lbl
+                  className={`flex-1 py-2.5 rounded-full items-center border-2 ${selectedLabel === lbl
                       ? 'bg-primary border-primary'
                       : 'bg-gray-50 border-gray-200'
-                  }`}
+                    }`}
                 >
                   <Text
-                    className={`font-quicksand-bold text-xs ${
-                      selectedLabel === lbl ? 'text-white' : 'text-gray-700'
-                    }`}
+                    className={`font-quicksand-bold text-xs ${selectedLabel === lbl ? 'text-white' : 'text-gray-700'
+                      }`}
                   >
                     {lbl === 'Home' ? '🏠 Home' : lbl === 'Work' ? '💼 Work' : '📍 Other'}
                   </Text>

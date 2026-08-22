@@ -197,6 +197,41 @@ export const getBanners = async () => {
   }
 }
 
+export const DEFAULT_GROCERY_PRODUCTS = [
+  {
+    id: 'gro_1',
+    name: 'Fresh Hass Avocados (3 Pcs)',
+    price: 2500,
+    discountPrice: 2200,
+    rating: 4.9,
+    image_url: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=500&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'gro_2',
+    name: 'Organic Red Tomatoes (1kg)',
+    price: 1800,
+    discountPrice: 1500,
+    rating: 4.8,
+    image_url: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=500&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'gro_3',
+    name: 'Whole Fresh Milk (1L)',
+    price: 1200,
+    discountPrice: 1000,
+    rating: 4.7,
+    image_url: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=500&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'gro_4',
+    name: 'Farm Fresh Eggs (Crate of 30)',
+    price: 4500,
+    discountPrice: 4200,
+    rating: 4.9,
+    image_url: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=500&auto=format&fit=crop&q=80',
+  },
+]
+
 export const seedDefaultBannersIfEmpty = async () => {
   try {
     const existing = await getBanners()

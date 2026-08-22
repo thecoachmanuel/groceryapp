@@ -1,3 +1,13 @@
+import { PaystackPayment } from '@/components/PaystackPayment'
+import { images } from '@/constants'
+import {
+  creditCustomerWallet,
+  getCustomerWallet,
+  getRefundPolicy,
+  getWalletTransactions,
+} from '@/lib/appwrite'
+import useAuthStore from '@/store/auth.store'
+import { useRouter } from 'expo-router'
 import React, { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
@@ -16,16 +26,6 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
-import useAuthStore from '@/store/auth.store'
-import {
-  getCustomerWallet,
-  creditCustomerWallet,
-  getWalletTransactions,
-  getRefundPolicy,
-} from '@/lib/appwrite'
-import { images } from '@/constants'
-import { PaystackPayment } from '@/components/PaystackPayment'
 
 const QUICK_AMOUNTS = [1000, 2500, 5000, 10000]
 

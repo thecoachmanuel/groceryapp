@@ -1,3 +1,8 @@
+import CartButton from '@/components/CartButton'
+import { images } from '@/constants'
+import { appwriteConfig, getMenuItemById } from '@/lib/appwrite'
+import { useCartStore } from '@/store/cart.store'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import React, { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
@@ -8,11 +13,6 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { appwriteConfig, getMenuItemById } from '@/lib/appwrite'
-import { useCartStore } from '@/store/cart.store'
-import CartButton from '@/components/CartButton'
-import { images } from '@/constants'
 
 const SAMPLE_CUSTOMIZATIONS = [
   { id: 'c1', name: 'Extra Cheese', price: 40, type: 'topping' },
@@ -44,7 +44,7 @@ export default function ProductDetail() {
               if (Array.isArray(vars) && vars.length > 0) {
                 setSelectedWeightVariant(vars[0])
               }
-            } catch {}
+            } catch { }
           }
         }
       } catch (err) {
@@ -185,9 +185,8 @@ export default function ProductDetail() {
                     <TouchableOpacity
                       key={wv.id || idx}
                       onPress={() => setSelectedWeightVariant(wv)}
-                      className={`px-4 py-3 rounded-2xl mr-3 border-2 items-center ${
-                        isSelected ? 'bg-primary border-primary' : 'bg-gray-50 border-gray-200'
-                      }`}
+                      className={`px-4 py-3 rounded-2xl mr-3 border-2 items-center ${isSelected ? 'bg-primary border-primary' : 'bg-gray-50 border-gray-200'
+                        }`}
                     >
                       <Text className={`font-quicksand-bold text-xs ${isSelected ? 'text-white' : 'text-gray-800'}`}>
                         {wv.weight}
@@ -259,19 +258,17 @@ export default function ProductDetail() {
                   <TouchableOpacity
                     key={cusId}
                     onPress={() => toggleCustomization({ ...cus, id: cusId })}
-                    className={`flex-row justify-between items-center p-4 rounded-2xl mb-3 border ${
-                      isSelected
+                    className={`flex-row justify-between items-center p-4 rounded-2xl mb-3 border ${isSelected
                         ? 'border-primary bg-primary/5'
                         : 'border-gray-200 bg-gray-50'
-                    }`}
+                      }`}
                   >
                     <View className="flex-row items-center">
                       <View
-                        className={`w-6 h-6 rounded-lg items-center justify-center mr-3 border ${
-                          isSelected
+                        className={`w-6 h-6 rounded-lg items-center justify-center mr-3 border ${isSelected
                             ? 'bg-primary border-primary'
                             : 'border-gray-400 bg-white'
-                        }`}
+                          }`}
                       >
                         {isSelected && (
                           <Text className="text-white text-xs font-bold">✓</Text>

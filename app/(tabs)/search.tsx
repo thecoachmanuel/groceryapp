@@ -1,8 +1,8 @@
 import CartButton from '@/components/CartButton'
 import Filter from '@/components/Filter'
+import FloatingCartPill from '@/components/FloatingCartPill'
 import MenuCard from '@/components/MenuCard'
 import Searchbar from '@/components/SearchBar'
-import FloatingCartPill from '@/components/FloatingCartPill'
 import { getCategories, getMenu } from '@/lib/appwrite'
 import useAppwrite from '@/lib/useAppwrite'
 import { MenuItem } from '@/type'
@@ -52,12 +52,18 @@ const Search = () => {
     if (!allProducts || allProducts.length === 0) return []
     return (allProducts as unknown as MenuItem[]).filter((item: any) => {
       // 1. Category Matching (by name, slug, or ID)
+      const selCat = String(liveCategory || 'all').toLowerCase().trim()
+      const itemCatName = String(item.categories || '').toLowerCase().trim()
+      const itemCatId = String(item.categoryId || '').toLowerCase().trim()
+      const itemType = String(item.type || '').toLowerCase().trim()
+
       const matchesCategory =
-        !liveCategory ||
-        liveCategory === 'all' ||
-        item.categories?.toLowerCase() === liveCategory.toLowerCase() ||
-        item.categoryId === liveCategory ||
-        item.type?.toLowerCase() === liveCategory.toLowerCase()
+        !selCat ||
+        selCat === 'all' ||
+        itemCatName === selCat ||
+        itemCatId === selCat ||
+        itemType === selCat ||
+        (itemCatName !== '' && selCat !== '' && (itemCatName.includes(selCat) || selCat.includes(itemCatName)))
 
       // 2. Search Text Matching (by product name, description, category)
       const q = liveQuery.toLowerCase().trim()

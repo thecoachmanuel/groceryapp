@@ -1,18 +1,18 @@
-import React, { useState } from 'react'
-import { View, Text, FlatList, Platform, Modal, TouchableOpacity, Alert, ActivityIndicator, TextInput, ScrollView, KeyboardAvoidingView, Keyboard } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { useCartStore } from '@/store/cart.store'
-import useAuthStore from '@/store/auth.store'
-import { useLocationStore } from '@/store/location.store'
-import CustomHeader from '@/components/CustomHeader'
-import cn from 'clsx'
-import CustomButton from '@/components/CustomButton'
 import CartItem from '@/components/CartItem'
+import CustomButton from '@/components/CustomButton'
+import CustomHeader from '@/components/CustomHeader'
 import LocationPickerModal from '@/components/LocationPickerModal'
 import { PaystackPayment } from '@/components/PaystackPayment'
+import { createOrder, debitCustomerWallet, getCustomerWallet, getDeliveryFeeSettings, updateUserProfile, validateAndApplyCoupon } from '@/lib/appwrite'
+import useAuthStore from '@/store/auth.store'
+import { useCartStore } from '@/store/cart.store'
+import { useLocationStore } from '@/store/location.store'
 import { PaymentInfoStripeProps } from '@/type'
-import { createOrder, updateUserProfile, getCustomerWallet, debitCustomerWallet, validateAndApplyCoupon, getDeliveryFeeSettings } from '@/lib/appwrite'
-import { useRouter, useFocusEffect } from 'expo-router'
+import cn from 'clsx'
+import { useFocusEffect, useRouter } from 'expo-router'
+import React, { useState } from 'react'
+import { ActivityIndicator, Alert, FlatList, Keyboard, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 const PaymentInfoStripe = ({
   label,
@@ -349,27 +349,24 @@ const Cart = () => {
               {/* Free Shipping Incentive Banner */}
               {freeDeliveryThreshold > 0 && (
                 <View
-                  className={`rounded-[24px] p-4 border-2 flex-row items-center ${
-                    isFreeDelivery
-                      ? 'bg-green-500/10 border-green-500/30'
-                      : 'bg-amber-500/10 border-amber-500/30'
-                  }`}
+                  className={`rounded-[24px] p-4 border-2 flex-row items-center ${isFreeDelivery
+                    ? 'bg-green-500/10 border-green-500/30'
+                    : 'bg-amber-500/10 border-amber-500/30'
+                    }`}
                 >
                   <Text className="text-2xl mr-3">{isFreeDelivery ? '🎉' : '🚚'}</Text>
                   <View className="flex-1">
                     <Text
-                      className={`font-quicksand-bold text-xs ${
-                        isFreeDelivery ? 'text-green-800' : 'text-amber-800'
-                      }`}
+                      className={`font-quicksand-bold text-xs ${isFreeDelivery ? 'text-green-800' : 'text-amber-800'
+                        }`}
                     >
                       {isFreeDelivery
                         ? 'FREE Delivery Unlocked!'
                         : `Add ₦${amountNeededForFreeDelivery.toLocaleString()} more for FREE Delivery`}
                     </Text>
                     <Text
-                      className={`font-quicksand-medium text-[11px] mt-0.5 ${
-                        isFreeDelivery ? 'text-green-700' : 'text-amber-700'
-                      }`}
+                      className={`font-quicksand-medium text-[11px] mt-0.5 ${isFreeDelivery ? 'text-green-700' : 'text-amber-700'
+                        }`}
                     >
                       {isFreeDelivery
                         ? `Your order exceeds ₦${freeDeliveryThreshold.toLocaleString()}`

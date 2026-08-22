@@ -1,19 +1,17 @@
+import useAuthStore from '@/store/auth.store'
+import useNotificationStore, { AppNotification } from '@/store/notification.store'
+import { useFocusEffect, useRouter } from 'expo-router'
 import React, { useCallback, useMemo, useState } from 'react'
 import {
-  Alert,
   FlatList,
-  Image,
   RefreshControl,
   ScrollView,
   StatusBar,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useFocusEffect, useRouter } from 'expo-router'
-import useAuthStore from '@/store/auth.store'
-import useNotificationStore, { AppNotification } from '@/store/notification.store'
 
 export default function NotificationsScreen() {
   const router = useRouter()
@@ -86,7 +84,15 @@ export default function NotificationsScreen() {
       } else if (role === 'seller') {
         router.push('/seller/orders' as any)
       } else {
-        router.push('/(tabs)/cart' as any)
+        router.push(`/order/${notif.orderId}` as any)
+      }
+    } else if (notif.type === 'order' || notif.type === 'seller_order' || notif.type === 'admin_order') {
+      if (role === 'admin') {
+        router.push('/admin/orders' as any)
+      } else if (role === 'seller') {
+        router.push('/seller/orders' as any)
+      } else {
+        router.push('/orders' as any)
       }
     } else if (notif.type === 'wallet') {
       router.push('/wallet' as any)
@@ -193,16 +199,14 @@ export default function NotificationsScreen() {
               <TouchableOpacity
                 key={chip.key}
                 onPress={() => setActiveFilter(chip.key)}
-                className={`px-3.5 py-2 mr-2 rounded-2xl border-2 ${
-                  isSelected
-                    ? 'bg-primary border-primary'
-                    : 'bg-white border-primary/10'
-                }`}
+                className={`px-3.5 py-2 mr-2 rounded-2xl border-2 ${isSelected
+                  ? 'bg-primary border-primary'
+                  : 'bg-white border-primary/10'
+                  }`}
               >
                 <Text
-                  className={`font-quicksand-bold text-xs ${
-                    isSelected ? 'text-white' : 'text-dark-100'
-                  }`}
+                  className={`font-quicksand-bold text-xs ${isSelected ? 'text-white' : 'text-dark-100'
+                    }`}
                 >
                   {chip.label}
                 </Text>
@@ -244,11 +248,10 @@ export default function NotificationsScreen() {
             <TouchableOpacity
               activeOpacity={0.88}
               onPress={() => handleNotificationPress(item)}
-              className={`rounded-[26px] p-4 mb-3 border-2 shadow-sm ${
-                item.read
-                  ? 'bg-white border-primary/10'
-                  : 'bg-green-50/50 border-primary/30 shadow-primary/10'
-              }`}
+              className={`rounded-[26px] p-4 mb-3 border-2 shadow-sm ${item.read
+                ? 'bg-white border-primary/10'
+                : 'bg-green-50/50 border-primary/30 shadow-primary/10'
+                }`}
             >
               <View className="flex-row items-start">
                 <View className={`w-11 h-11 rounded-2xl ${meta.bg} border ${meta.border} items-center justify-center mr-3 mt-0.5`}>

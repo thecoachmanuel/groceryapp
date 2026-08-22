@@ -1,3 +1,7 @@
+import { images } from '@/constants'
+import { getAllOrders, getUserOrders } from '@/lib/appwrite'
+import useAuthStore from '@/store/auth.store'
+import { useRouter } from 'expo-router'
 import React, { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
@@ -6,17 +10,12 @@ import {
   Image,
   Pressable,
   RefreshControl,
-  ScrollView,
   StatusBar,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
-import useAuthStore from '@/store/auth.store'
-import { getAllOrders, getUserOrders } from '@/lib/appwrite'
-import { images } from '@/constants'
 
 type TabKey = 'all' | 'ongoing' | 'past'
 
@@ -236,9 +235,8 @@ export default function CustomerOrdersList() {
               style={{ flex: 1 }}
             >
               <View
-                className={`py-2.5 rounded-full items-center border-2 ${
-                  isActive ? 'bg-primary border-primary' : 'bg-white border-primary/10'
-                }`}
+                className={`py-2.5 rounded-full items-center border-2 ${isActive ? 'bg-primary border-primary' : 'bg-white border-primary/10'
+                  }`}
               >
                 <Text className={`font-quicksand-bold text-xs ${isActive ? 'text-white' : 'text-dark-100'}`}>
                   {tab.label}
@@ -272,8 +270,8 @@ export default function CustomerOrdersList() {
                 {activeTab === 'ongoing'
                   ? 'You have no active ongoing orders.'
                   : activeTab === 'past'
-                  ? 'No past orders in your history yet.'
-                  : "You haven't placed any orders yet."}
+                    ? 'No past orders in your history yet.'
+                    : "You haven't placed any orders yet."}
               </Text>
             </View>
           )}

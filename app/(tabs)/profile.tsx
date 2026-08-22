@@ -1,4 +1,7 @@
-import { account, appwriteConfig, uploadAvatar, updateUserProfile } from '@/lib/appwrite'
+import { account, appwriteConfig, updateUserProfile, uploadAvatar } from '@/lib/appwrite'
+import useAuthStore from '@/store/auth.store'
+import useBrandingStore from '@/store/branding.store'
+import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
 import React, { useState } from 'react'
 import {
@@ -14,10 +17,6 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import useAuthStore from '@/store/auth.store'
-import * as ImagePicker from 'expo-image-picker'
-import AddressManagerModal from '@/components/AddressManagerModal'
-import useBrandingStore from '@/store/branding.store'
 
 const Profile = () => {
   const router = useRouter()
