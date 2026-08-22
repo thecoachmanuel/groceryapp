@@ -5,12 +5,13 @@ import {
   FlatList,
   Image,
   Modal,
+  Platform,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
-import MapView, { Marker } from 'react-native-maps'
+import MapView, { Marker, PROVIDER_DEFAULT, PROVIDER_GOOGLE } from 'react-native-maps'
 import * as Location from 'expo-location'
 import { useLocationStore } from '@/store/location.store'
 import { images } from '@/constants'
@@ -22,6 +23,43 @@ interface LocationPickerModalProps {
   visible: boolean
   onClose: () => void
   titleNote?: string
+}
+
+class MapErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback?: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: any) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.warn('MapView ErrorBoundary caught error:', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        this.props.fallback || (
+          <View className="flex-1 items-center justify-center p-6 bg-gray-50">
+            <Text className="text-4xl mb-2 font-quicksand-bold">📍</Text>
+            <Text className="text-base font-quicksand-bold text-dark-100 text-center mb-1">
+              Map View Unavailable
+            </Text>
+            <Text className="text-xs font-quicksand-medium text-gray-500 text-center">
+              You can search for your area above or use GPS to set your delivery location.
+            </Text>
+          </View>
+        )
+      )
+    }
+    return this.props.children
+  }
 }
 
 export default function LocationPickerModal({
@@ -50,7 +88,7 @@ export default function LocationPickerModal({
     if (visible) {
       if (latitude && longitude) {
         setCurrentCoords({ latitude, longitude })
-        animateMapTo(latitude, longitude)
+        setTimeout(() => animateMapTo(latitude, longitude), 300)
       } else {
         fetchGPSLocation()
       }
@@ -69,15 +107,19 @@ export default function LocationPickerModal({
   }, [search])
 
   const animateMapTo = (lat: number, lng: number) => {
-    mapRef.current?.animateToRegion(
-      {
-        latitude: lat,
-        longitude: lng,
-        latitudeDelta: 0.008,
-        longitudeDelta: 0.008,
-      },
-      500
-    )
+    try {
+      mapRef.current?.animateToRegion(
+        {
+          latitude: lat,
+          longitude: lng,
+          latitudeDelta: 0.008,
+          longitudeDelta: 0.008,
+        },
+        500
+      )
+    } catch (e) {
+      console.log('animateMapTo error:', e)
+    }
   }
 
   const fetchGPSLocation = async () => {
@@ -86,20 +128,26 @@ export default function LocationPickerModal({
       const { status } = await Location.requestForegroundPermissionsAsync()
       if (status !== 'granted') {
         Alert.alert(
-          'Location Access Denied',
-          'Please allow location permission to detect your current position, or select your location manually on the map.'
+          'Location Access Required',
+          'Please allow location access to auto-detect your delivery address, or search manually.'
         )
         return
       }
 
-      const loc = await Location.getCurrentPositionAsync({
+      let loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
-      })
+      }).catch(() => null)
 
-      const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude }
-      setCurrentCoords(coords)
-      animateMapTo(coords.latitude, coords.longitude)
-      await reverseGeocode(coords.latitude, coords.longitude)
+      if (!loc) {
+        loc = await Location.getLastKnownPositionAsync().catch(() => null)
+      }
+
+      if (loc?.coords) {
+        const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude }
+        setCurrentCoords(coords)
+        animateMapTo(coords.latitude, coords.longitude)
+        await reverseGeocode(coords.latitude, coords.longitude)
+      }
     } catch (err) {
       console.log('GPS fetch error:', err)
     } finally {
@@ -111,7 +159,9 @@ export default function LocationPickerModal({
     setIsGeocoding(true)
     try {
       // 1. Primary Expo Location Reverse Geocoding
-      const [geo] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng })
+      const [geo] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng }).catch(
+        () => [null]
+      )
       if (geo) {
         const streetNumber = geo.streetNumber || ''
         const street = geo.street || geo.name || ''
@@ -138,33 +188,36 @@ export default function LocationPickerModal({
       const resp = await fetch(
         `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
         { headers: { 'User-Agent': 'GroceryApp/1.0' } }
-      )
-      const data = await resp.json()
-      if (data && data.address) {
-        const a = data.address
-        const houseNumber = a.house_number || a.building || ''
-        const road = a.road || a.street || a.pedestrian || a.suburb || a.neighbourhood || ''
-        const streetLine = [houseNumber, road].filter(Boolean).join(' ').trim()
+      ).catch(() => null)
 
-        const suburb = a.suburb || a.neighbourhood || a.quarter || ''
-        const city = a.city || a.town || a.county || a.state || ''
-        const country = a.country || ''
+      if (resp && resp.ok) {
+        const data = await resp.json().catch(() => null)
+        if (data && data.address) {
+          const a = data.address
+          const houseNumber = a.house_number || a.building || ''
+          const road = a.road || a.street || a.pedestrian || a.suburb || a.neighbourhood || ''
+          const streetLine = [houseNumber, road].filter(Boolean).join(' ').trim()
 
-        const fullParts = [streetLine, suburb, city, country].filter(Boolean)
-        const uniqueOsmParts: string[] = []
-        fullParts.forEach((p) => {
-          if (!uniqueOsmParts.includes(p)) uniqueOsmParts.push(p)
-        })
+          const suburb = a.suburb || a.neighbourhood || a.quarter || ''
+          const city = a.city || a.town || a.county || a.state || ''
+          const country = a.country || ''
 
-        const osmFormatted = uniqueOsmParts.join(', ')
-        if (osmFormatted && osmFormatted.length > 3) {
-          setSelectedAddress(osmFormatted)
-          return
-        }
+          const fullParts = [streetLine, suburb, city, country].filter(Boolean)
+          const uniqueOsmParts: string[] = []
+          fullParts.forEach((p) => {
+            if (!uniqueOsmParts.includes(p)) uniqueOsmParts.push(p)
+          })
 
-        if (data.display_name) {
-          setSelectedAddress(data.display_name)
-          return
+          const osmFormatted = uniqueOsmParts.join(', ')
+          if (osmFormatted && osmFormatted.length > 3) {
+            setSelectedAddress(osmFormatted)
+            return
+          }
+
+          if (data.display_name) {
+            setSelectedAddress(data.display_name)
+            return
+          }
         }
       }
 
@@ -197,6 +250,7 @@ export default function LocationPickerModal({
   const handleSelectPrediction = (place: any) => {
     const lat = parseFloat(place.lat)
     const lng = parseFloat(place.lon)
+    if (isNaN(lat) || isNaN(lng)) return
     const coords = { latitude: lat, longitude: lng }
     setCurrentCoords(coords)
     setSelectedAddress(place.display_name)
@@ -207,7 +261,9 @@ export default function LocationPickerModal({
   }
 
   const handleMarkerDragEnd = (e: any) => {
-    const { latitude: lat, longitude: lng } = e.nativeEvent.coordinate
+    const coord = e?.nativeEvent?.coordinate
+    if (!coord || typeof coord.latitude !== 'number' || typeof coord.longitude !== 'number') return
+    const { latitude: lat, longitude: lng } = coord
     setCurrentCoords({ latitude: lat, longitude: lng })
     reverseGeocode(lat, lng)
   }
@@ -255,7 +311,7 @@ export default function LocationPickerModal({
           <View className="size-5" />
         </View>
 
-        {/* Search Bar Input - Discover Page SearchBar style */}
+        {/* Search Bar Input */}
         <View className="p-4 bg-white z-20 shadow-sm border-b-2 border-primary/10">
           <View className="flex-row items-center bg-white border-2 border-primary/10 rounded-full px-4 py-2.5 shadow-md shadow-black/10">
             <Text className="text-base mr-2">🔍</Text>
@@ -297,33 +353,36 @@ export default function LocationPickerModal({
           )}
         </View>
 
-        {/* Interactive Map View */}
+        {/* Interactive Map View with ErrorBoundary */}
         <View className="flex-1 relative bg-gray-100">
-          <MapView
-            ref={mapRef}
-            style={{ width: '100%', height: '100%' }}
-            initialRegion={{
-              latitude: currentCoords.latitude,
-              longitude: currentCoords.longitude,
-              latitudeDelta: 0.008,
-              longitudeDelta: 0.008,
-            }}
-            onPress={(e) => handleMarkerDragEnd(e)}
-          >
-            <Marker
-              coordinate={currentCoords}
-              draggable
-              onDragEnd={handleMarkerDragEnd}
-              title="Delivery Location"
-              description={selectedAddress}
-            />
-          </MapView>
+          <MapErrorBoundary>
+            <MapView
+              ref={mapRef}
+              style={{ width: '100%', height: '100%' }}
+              provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
+              initialRegion={{
+                latitude: currentCoords.latitude,
+                longitude: currentCoords.longitude,
+                latitudeDelta: 0.008,
+                longitudeDelta: 0.008,
+              }}
+              onPress={(e) => handleMarkerDragEnd(e)}
+            >
+              <Marker
+                coordinate={currentCoords}
+                draggable
+                onDragEnd={handleMarkerDragEnd}
+                title="Delivery Location"
+                description={selectedAddress}
+              />
+            </MapView>
+          </MapErrorBoundary>
 
           {/* GPS Locate Button Overlay */}
           <TouchableOpacity
             onPress={fetchGPSLocation}
             disabled={isLocatingUser}
-            className="absolute bottom-4 right-4 bg-white p-3.5 rounded-full shadow-lg border-2 border-primary/10 flex-row items-center justify-center active:opacity-80"
+            className="absolute bottom-4 right-4 bg-white p-3.5 rounded-full shadow-lg border-2 border-primary/10 flex-row items-center justify-center active:opacity-80 z-10"
           >
             {isLocatingUser ? (
               <ActivityIndicator size="small" color="#16A34A" />
@@ -391,3 +450,4 @@ export default function LocationPickerModal({
     </Modal>
   )
 }
+

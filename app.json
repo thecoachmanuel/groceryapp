@@ -9,7 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Grocery App uses your location to deliver groceries to your address.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Grocery App uses your location to deliver groceries to your address."
+      }
     },
     "android": {
       "package": "com.grocery.app",
@@ -18,7 +22,11 @@
         "foregroundImage": "./assets/images/logo.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -37,6 +45,12 @@
           "dark": {
             "backgroundColor": "#ffffff"
           }
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Grocery App uses your location to deliver groceries to your address."
         }
       ],
       "expo-font",
