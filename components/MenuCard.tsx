@@ -13,10 +13,10 @@ interface MenuCardProps {
 const MenuCard = ({ item }: MenuCardProps) => {
   const { $id, name, price, type, rating, discountPrice } = item
   const rawImage = item.image_url || (item as any).imageUrl || (item as any).image || ''
-  const rawImageUrl = rawImage?.startsWith('http')
-    ? (rawImage.includes('project=') ? rawImage : `${rawImage}${rawImage.includes('?') ? '&' : '?'}project=${appwriteConfig.projectId}`)
-    : rawImage
-  const imageUrl = getOptimizedImageUrl(rawImageUrl, 300, 300) || rawImageUrl
+  let imageUrl = rawImage
+  if (typeof rawImage === 'string' && rawImage.includes('/storage/buckets/') && !rawImage.includes('project=')) {
+    imageUrl = `${rawImage}${rawImage.includes('?') ? '&' : '?'}project=${appwriteConfig.projectId}`
+  }
   const { items, addItem, increaseQty, decreaseQty } = useCartStore()
   const router = useRouter()
 

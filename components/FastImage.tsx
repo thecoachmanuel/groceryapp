@@ -37,8 +37,12 @@ export default function FastImage({
     resolvedSource = source
   }
 
-  if (hasError) {
-    resolvedSource = images.logo
+  if (hasError || !source) {
+    return (
+      <View className={`relative overflow-hidden bg-emerald-50 items-center justify-center ${className}`} style={style}>
+        <ActivityIndicator size="small" color="#16A34A" />
+      </View>
+    )
   }
 
   return (
@@ -47,7 +51,7 @@ export default function FastImage({
         source={resolvedSource}
         style={[{ width: '100%', height: '100%' }, style]}
         contentFit={contentFit}
-        cachePolicy="memory"
+        cachePolicy="memory-disk"
         transition={200}
         onLoadStart={() => setIsLoading(true)}
         onLoadEnd={() => setIsLoading(false)}

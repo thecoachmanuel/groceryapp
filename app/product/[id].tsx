@@ -1,4 +1,5 @@
 import CartButton from '@/components/CartButton'
+import FastImage from '@/components/FastImage'
 import { images } from '@/constants'
 import { appwriteConfig, getMenuItemById } from '@/lib/appwrite'
 import { useCartStore } from '@/store/cart.store'
@@ -6,7 +7,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import React, { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
-  Image,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -24,28 +24,28 @@ const SAMPLE_CUSTOMIZATIONS = [
 export default function ProductDetail() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
-  const { addItem } = useCartStore()
+  const addItem = useCartStore((s) => s.addItem)
 
   const [item, setItem] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [quantity, setQuantity] = useState(1)
   const [selectedCustomizations, setSelectedCustomizations] = useState<any[]>([])
   const [selectedWeightVariant, setSelectedWeightVariant] = useState<any>(null)
+  const [quantity, setQuantity] = useState(1)
 
   useEffect(() => {
     async function loadItem() {
+      if (!id) return
       try {
-        if (id) {
-          const data = await getMenuItemById(id)
-          setItem(data)
-          if (data?.weightVariants) {
-            try {
-              const vars = JSON.parse(data.weightVariants)
-              if (Array.isArray(vars) && vars.length > 0) {
-                setSelectedWeightVariant(vars[0])
-              }
-            } catch { }
-          }
+        setLoading(true)
+        const data = await getMenuItemById(id)
+        setItem(data)
+        if (data?.weightVariants) {
+          try {
+            const parsed = JSON.parse(data.weightVariants)
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setSelectedWeightVariant(parsed[0])
+            }
+          } catch {}
         }
       } catch (err) {
         console.error('Error fetching product:', err)
@@ -89,9 +89,10 @@ export default function ProductDetail() {
   }
 
   const rawImage = item.image_url || (item as any).imageUrl || (item as any).image || ''
-  const imageUrl = rawImage?.startsWith('http')
-    ? (rawImage.includes('project=') ? rawImage : `${rawImage}${rawImage.includes('?') ? '&' : '?'}project=${appwriteConfig.projectId}`)
-    : rawImage
+  let imageUrl = rawImage
+  if (typeof rawImage === 'string' && rawImage.includes('/storage/buckets/') && !rawImage.includes('project=')) {
+    imageUrl = `${rawImage}${rawImage.includes('?') ? '&' : '?'}project=${appwriteConfig.projectId}`
+  }
 
   const weightVariantsList: any[] = item.weightVariants ? JSON.parse(item.weightVariants) : []
   const baseUnitPrice = selectedWeightVariant ? selectedWeightVariant.price : item.price
@@ -128,10 +129,10 @@ export default function ProductDetail() {
             onPress={() => router.back()}
             className="w-10 h-10 bg-white rounded-full items-center justify-center shadow-md shadow-black/10"
           >
-            <Image
+            <FastImage
               source={images.arrowBack}
               className="w-5 h-5"
-              resizeMode="contain"
+              contentFit="contain"
             />
           </TouchableOpacity>
           <Text className="font-quicksand-bold text-lg text-dark-100">
@@ -143,10 +144,10 @@ export default function ProductDetail() {
         {/* Product Image Banner */}
         <View className="items-center my-6">
           <View className="w-72 h-72 bg-white rounded-[40px] p-6 shadow-xl shadow-black/10 items-center justify-center border border-primary/10">
-            <Image
-              source={{ uri: imageUrl }}
+            <FastImage
+              source={imageUrl}
               className="w-full h-full"
-              resizeMode="contain"
+              contentFit="contain"
             />
           </View>
         </View>
@@ -259,15 +260,15 @@ export default function ProductDetail() {
                     key={cusId}
                     onPress={() => toggleCustomization({ ...cus, id: cusId })}
                     className={`flex-row justify-between items-center p-4 rounded-2xl mb-3 border ${isSelected
-                        ? 'border-primary bg-primary/5'
-                        : 'border-gray-200 bg-gray-50'
+                      ? 'border-primary bg-primary/5'
+                      : 'border-gray-200 bg-gray-50'
                       }`}
                   >
                     <View className="flex-row items-center">
                       <View
                         className={`w-6 h-6 rounded-lg items-center justify-center mr-3 border ${isSelected
-                            ? 'bg-primary border-primary'
-                            : 'border-gray-400 bg-white'
+                          ? 'bg-primary border-primary'
+                          : 'border-gray-400 bg-white'
                           }`}
                       >
                         {isSelected && (

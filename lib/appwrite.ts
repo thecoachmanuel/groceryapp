@@ -1,5 +1,5 @@
+import { CreateUserParams, GetMenuParams, SignInParams } from '@/type'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { CreateUserParams, GetMenuParams, SignInParams, UserRole } from '@/type'
 import {
   Account,
   Avatars,
@@ -674,7 +674,7 @@ export const deleteProduct = async (productId: string, imageUrl?: string) => {
       const match = imageUrl.match(/\/files\/([a-zA-Z0-9_-]+)/)
       if (match && match[1]) {
         const fileId = match[1]
-        await storage.deleteFile(appwriteConfig.bucketId, fileId).catch(() => {})
+        await storage.deleteFile(appwriteConfig.bucketId, fileId).catch(() => { })
       }
     } catch {
       // Ignore storage cleanup error
@@ -746,7 +746,7 @@ export const subscribeToOrders = (callback: (response: any) => void) => {
     })
   } catch (e) {
     console.error('Error subscribing to orders realtime:', e)
-    return () => {}
+    return () => { }
   }
 }
 
@@ -1455,7 +1455,7 @@ export const getPlatformPolicies = async () => {
         merged.freeDeliveryThreshold = Number(dbDoc.freeDeliveryThreshold)
       }
       localPolicyCache = merged
-      AsyncStorage.setItem(POLICY_STORAGE_KEY, JSON.stringify(merged)).catch(() => {})
+      AsyncStorage.setItem(POLICY_STORAGE_KEY, JSON.stringify(merged)).catch(() => { })
       return merged
     }
 
@@ -1486,7 +1486,7 @@ export const updatePlatformPolicies = async (policyData: Partial<any>) => {
 
     // 2. Immediately save to in-memory and persistent AsyncStorage
     localPolicyCache = merged
-    await AsyncStorage.setItem(POLICY_STORAGE_KEY, JSON.stringify(merged)).catch(() => {})
+    await AsyncStorage.setItem(POLICY_STORAGE_KEY, JSON.stringify(merged)).catch(() => { })
 
     let payload = { ...merged }
     delete payload.$id

@@ -464,20 +464,10 @@ export default function Index() {
             {(popularProducts.length > 0 ? popularProducts : DEFAULT_GROCERY_PRODUCTS).slice(0, 8).map((item: any, idx: number) => {
               const productId = item.$id || item.id || `pop_${idx}`
               const rawImg = item.image_url || item.imageUrl || item.image || item.iconUrl || ''
-              let imageUrl: any = ''
+              let imageUrl: any = rawImg
               const n = (item.name || '').toLowerCase()
 
-              // 1. Direct Appwrite / Cloud / HTTP image from database document
-              if (typeof rawImg === 'string' && rawImg.trim().length > 5 && !rawImg.includes('vecteezy')) {
-                if (rawImg.startsWith('http')) {
-                  imageUrl = rawImg.includes('appwrite') && !rawImg.includes('project=')
-                    ? `${rawImg}${rawImg.includes('?') ? '&' : '?'}project=${appwriteConfig.projectId}`
-                    : rawImg
-                } else {
-                  imageUrl = rawImg
-                }
-              } else {
-                // 2. High-res Grocery Unsplash fallback only if database image URL is completely empty
+              if (!imageUrl || (typeof imageUrl === 'string' && (imageUrl.includes('vecteezy') || imageUrl.trim() === ''))) {
                 if (n.includes('avocado')) imageUrl = 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=500&auto=format&fit=crop&q=80'
                 else if (n.includes('tomato')) imageUrl = 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=500&auto=format&fit=crop&q=80'
                 else if (n.includes('milk')) imageUrl = 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=500&auto=format&fit=crop&q=80'
@@ -491,10 +481,9 @@ export default function Index() {
                 else if (n.includes('burger')) imageUrl = 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&auto=format&fit=crop&q=80'
                 else if (n.includes('pizza')) imageUrl = 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=80'
                 else imageUrl = 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=500&auto=format&fit=crop&q=80'
+              } else if (typeof rawImg === 'string' && rawImg.startsWith('http')) {
+                imageUrl = rawImg.includes('project=') ? rawImg : `${rawImg}${rawImg.includes('?') ? '&' : '?'}project=${appwriteConfig.projectId}`
               }
-
-              const displayPrice = item.discountPrice && item.discountPrice < item.price ? item.discountPrice : item.price
-              const originalPrice = item.discountPrice && item.discountPrice < item.price ? item.price : null
 
               return (
                 <TouchableOpacity
@@ -512,7 +501,7 @@ export default function Index() {
                       contentFit="cover"
                     />
 
-                    {originalPrice ? (
+                    {item.discountPrice && item.discountPrice < item.price ? (
                       <View className="absolute top-1.5 right-1.5 bg-red-500 px-1.5 py-0.5 rounded-full z-10">
                         <Text className="text-[8px] font-quicksand-bold text-white uppercase">Sale</Text>
                       </View>
@@ -535,16 +524,9 @@ export default function Index() {
                     </Text>
 
                     <View className="flex-row items-center justify-between mt-2 pt-2 border-t border-primary/10 min-h-[36px]">
-                      <View>
-                        <Text className="font-quicksand-bold text-sm text-primary">
-                          ₦{Number(displayPrice || 0).toLocaleString()}
-                        </Text>
-                        {originalPrice ? (
-                          <Text className="font-quicksand-medium text-[10px] text-gray-400 line-through">
-                            ₦{Number(originalPrice).toLocaleString()}
-                          </Text>
-                        ) : null}
-                      </View>
+                      <Text className="font-quicksand-bold text-sm text-primary">
+                        ₦{Number(item.price || 0).toLocaleString()}
+                      </Text>
 
                       <TouchableOpacity
                         onPress={(e) => {
