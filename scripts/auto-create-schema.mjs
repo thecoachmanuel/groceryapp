@@ -232,6 +232,12 @@ async function autoCreateSchema() {
   await createBooleanAttr('platform_policies', 'productApprovalRequired', false);
   await createBooleanAttr('platform_policies', 'sellerOrderCancellationAllowed', false);
   await createFloatAttr('platform_policies', 'defaultCommissionRate', false);
+  await createFloatAttr('platform_policies', 'deliveryFee', false);
+  await createFloatAttr('platform_policies', 'freeDeliveryThreshold', false);
+  await createBooleanAttr('platform_policies', 'refundsEnabled', false);
+  await createStringAttr('platform_policies', 'appName', 255, false);
+  await createStringAttr('platform_policies', 'appLogo', 1000, false);
+  await createStringAttr('platform_policies', 'appTagline', 500, false);
   await createStringAttr('platform_policies', 'updatedAt', 255, false);
 
   console.log('\n🎉 Auto schema setup finished!');

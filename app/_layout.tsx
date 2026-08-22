@@ -1,4 +1,4 @@
-import {SplashScreen, Stack} from "expo-router";
+import { SplashScreen, Stack, useRouter } from "expo-router";
 import { useFonts } from 'expo-font';
 import { useEffect} from "react";
 
@@ -8,18 +8,10 @@ import useAuthStore from "@/store/auth.store";
 
 Sentry.init({
   dsn: 'https://94edd17ee98a307f2d85d750574c454a@o4506876178464768.ingest.us.sentry.io/4509588544094208',
-
-  // Adds more context data to events (IP address, cookies, user, etc.)
-  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
   sendDefaultPii: true,
-
-  // Configure Session Replay
   replaysSessionSampleRate: 1,
   replaysOnErrorSampleRate: 1,
   integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
-
-  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
-  // spotlight: __DEV__,
 });
 
 import { useState } from 'react';
@@ -31,10 +23,11 @@ import useBrandingStore from "@/store/branding.store";
 import useNotificationStore from "@/store/notification.store";
 
 export default Sentry.wrap(function RootLayout() {
+  const router = useRouter();
   const { isLoading, fetchAuthenticatedUser, user, role, isSeller, isAdmin, sellerStore } = useAuthStore();
   const { appName, appLogo, fetchBranding } = useBrandingStore();
   const { addNotification } = useNotificationStore();
-  const [notification, setNotification] = useState<{ title: string; body: string; icon?: string } | null>(null);
+  const [notification, setNotification] = useState<{ title: string; body: string; icon?: string; orderId?: string } | null>(null);
 
   const [fontsLoaded, error] = useFonts({
     "QuickSand-Bold": require('../assets/fonts/Quicksand-Bold.ttf'),
@@ -70,7 +63,6 @@ export default Sentry.wrap(function RootLayout() {
       const sellerStoreId = sellerStore?.$id || (user as any)?.storeId
 
       // ── 1. SELLER NOTIFICATION ──
-      // Peculiar to Seller: Notify if order was placed for their specific store
       if (isSeller && (order.sellerId === sellerStoreId || order.items?.includes(sellerStoreId))) {
         const notifTitle = isNewOrder ? '📦 New Store Order Received!' : `Store Order Update: ${order.status?.replace('_', ' ').toUpperCase()}`
         const notifBody = isNewOrder
@@ -86,13 +78,12 @@ export default Sentry.wrap(function RootLayout() {
           orderId: order.$id,
         })
 
-        setNotification({ title: notifTitle, body: notifBody, icon: '🏪' })
+        setNotification({ title: notifTitle, body: notifBody, icon: '🏪', orderId: order.$id })
         setTimeout(() => setNotification(null), 6000)
         return
       }
 
       // ── 2. ADMIN NOTIFICATION ──
-      // Peculiar to Admin: Comprehensive platform-wide order oversight
       if (isAdmin) {
         const notifTitle = isNewOrder ? '🔔 New Platform Order Placed!' : `Platform Order #${orderIdShort} Updated`
         const notifBody = `Order #${orderIdShort} by ${order.userName || order.userEmail || 'Customer'} (₦${Number(order.totalAmount || 0).toLocaleString()}) → ${order.status?.replace('_', ' ')}.`
@@ -105,13 +96,12 @@ export default Sentry.wrap(function RootLayout() {
           orderId: order.$id,
         })
 
-        setNotification({ title: notifTitle, body: notifBody, icon: '👑' })
+        setNotification({ title: notifTitle, body: notifBody, icon: '👑', orderId: order.$id })
         setTimeout(() => setNotification(null), 6000)
         return
       }
 
       // ── 3. CUSTOMER NOTIFICATION ──
-      // Peculiar to Customer: Status of their personal order
       if (user && (order.userId === currentUserId || order.userEmail === user.email)) {
         const notifTitle = isNewOrder ? '🎉 Order Placed Successfully!' : `Order #${orderIdShort} Status: ${order.status?.replace('_', ' ').toUpperCase()}`
         const notifBody = isNewOrder
@@ -127,7 +117,7 @@ export default Sentry.wrap(function RootLayout() {
           orderId: order.$id,
         })
 
-        setNotification({ title: notifTitle, body: notifBody, icon: '🥬' })
+        setNotification({ title: notifTitle, body: notifBody, icon: '🥬', orderId: order.$id })
         setTimeout(() => setNotification(null), 6000)
       }
     })
@@ -173,11 +163,31 @@ export default Sentry.wrap(function RootLayout() {
       {notification && (
         <TouchableOpacity
           activeOpacity={0.9}
-          onPress={() => setNotification(null)}
+          onPress={() => {
+            const targetOrderId = notification.orderId
+            setNotification(null)
+            if (targetOrderId) {
+              if (role === 'admin') {
+                router.push('/admin/orders' as any)
+              } else if (role === 'seller') {
+                router.push('/seller/orders' as any)
+              } else {
+                router.push(`/order/${targetOrderId}` as any)
+              }
+            } else {
+              if (role === 'admin') {
+                router.push('/admin/orders' as any)
+              } else if (role === 'seller') {
+                router.push('/seller/orders' as any)
+              } else {
+                router.push('/orders' as any)
+              }
+            }
+          }}
           className="absolute top-12 left-5 right-5 bg-dark-100 rounded-2xl p-4 shadow-2xl z-50 border border-primary/30 flex-row items-center"
         >
           <View className="w-10 h-10 rounded-xl bg-primary/20 items-center justify-center mr-3">
-            <Text className="text-xl">🔔</Text>
+            <Text className="text-xl">{notification.icon || '🔔'}</Text>
           </View>
           <View className="flex-1">
             <Text className="text-white font-quicksand-bold text-sm">
@@ -186,8 +196,13 @@ export default Sentry.wrap(function RootLayout() {
             <Text className="text-gray-300 font-quicksand-medium text-xs">
               {notification.body}
             </Text>
+            <Text className="text-primary font-quicksand-bold text-[11px] mt-1">
+              Tap to view order details →
+            </Text>
           </View>
-          <Text className="text-gray-400 font-bold ml-2">✕</Text>
+          <TouchableOpacity onPress={() => setNotification(null)} className="p-1">
+            <Text className="text-gray-400 font-bold ml-2">✕</Text>
+          </TouchableOpacity>
         </TouchableOpacity>
       )}
     </View>

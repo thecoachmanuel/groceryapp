@@ -1410,8 +1410,15 @@ export const getPlatformPolicies = async () => {
 
     if (docs && docs.documents && docs.documents.length > 0) {
       const dbDoc = docs.documents[0]
-      // Database live document takes precedence
-      const merged = { ...defaultPolicies(), ...localPolicyCache, ...dbDoc }
+      // Merge defaults, dbDoc, and localPolicyCache so admin changes persist cleanly
+      const merged = { ...defaultPolicies(), ...dbDoc, ...localPolicyCache }
+      // Clean up undefined / null fields if dbDoc has valid numeric values
+      if (dbDoc.deliveryFee !== undefined && dbDoc.deliveryFee !== null) {
+        merged.deliveryFee = Number(dbDoc.deliveryFee)
+      }
+      if (dbDoc.freeDeliveryThreshold !== undefined && dbDoc.freeDeliveryThreshold !== null) {
+        merged.freeDeliveryThreshold = Number(dbDoc.freeDeliveryThreshold)
+      }
       localPolicyCache = merged
       AsyncStorage.setItem(POLICY_STORAGE_KEY, JSON.stringify(merged)).catch(() => {})
       return merged
@@ -1438,7 +1445,7 @@ export const getDeliveryFeeSettings = async () => {
 
 export const updatePlatformPolicies = async (policyData: Partial<any>) => {
   try {
-    // 1. Get current complete policies to prevent wiping existing settings (like deliveryFee when updating branding)
+    // 1. Get current complete policies to prevent wiping existing settings
     const existing = await getPlatformPolicies()
     const merged = { ...existing, ...policyData, updatedAt: new Date().toISOString() }
 
@@ -1490,7 +1497,19 @@ export const updatePlatformPolicies = async (policyData: Partial<any>) => {
         }
 
         if (errStr.toLowerCase().includes('unknown attribute')) {
-          const coreKeys = ['cartMode', 'productApprovalRequired', 'sellerOrderCancellationAllowed', 'defaultCommissionRate', 'updatedAt']
+          const coreKeys = [
+            'cartMode',
+            'productApprovalRequired',
+            'sellerOrderCancellationAllowed',
+            'defaultCommissionRate',
+            'refundsEnabled',
+            'deliveryFee',
+            'freeDeliveryThreshold',
+            'appName',
+            'appLogo',
+            'appTagline',
+            'updatedAt',
+          ]
           const sanitized: any = {}
           for (const k of coreKeys) {
             if (k in payload) sanitized[k] = (payload as any)[k]
