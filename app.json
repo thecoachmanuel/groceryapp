@@ -40,14 +40,6 @@
         }
       ],
       "expo-font",
-      [
-        "@sentry/react-native/expo",
-        {
-          "url": "https://sentry.io/",
-          "project": "react-native-food",
-          "organization": "razaan"
-        }
-      ],
       "expo-web-browser"
     ],
     "experiments": {
