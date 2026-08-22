@@ -7,7 +7,7 @@
     "icon": "./assets/images/logo.png",
     "scheme": "groceryapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true
     },
@@ -47,7 +47,8 @@
           "project": "react-native-food",
           "organization": "razaan"
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
