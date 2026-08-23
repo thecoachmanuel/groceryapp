@@ -1,17 +1,24 @@
 import { images } from '@/constants'
 import * as Location from 'expo-location'
 import React, { useEffect, useState } from 'react'
-import { Image, Text, TouchableOpacity, View } from 'react-native'
+import { Image, Platform, Text, TouchableOpacity, View } from 'react-native'
 import { useLocationStore } from '@/store/location.store'
 import LocationPickerModal from '@/components/LocationPickerModal'
 
 const DeliverTo = () => {
   const { address, setLocation } = useLocationStore()
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(Platform.OS !== 'web' && !address)
   const [modalVisible, setModalVisible] = useState(false)
 
   useEffect(() => {
     const getLocation = async () => {
+      if (Platform.OS === 'web') {
+        if (!address) {
+          setLocation('Lagos, Nigeria', { latitude: 6.5244, longitude: 3.3792 }, false)
+        }
+        setLoading(false)
+        return
+      }
       try {
         const { status } = await Location.requestForegroundPermissionsAsync()
         if (status !== 'granted') {

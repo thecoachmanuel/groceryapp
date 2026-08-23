@@ -86,10 +86,10 @@ export default function Index() {
 
   const { latitude, longitude } = useLocationStore()
 
-  const [banners, setBanners] = useState<any[] | null>(null)
-  const [stores, setStores] = useState<any[]>([])
+  const [banners, setBanners] = useState<any[]>(offers)
+  const [stores, setStores] = useState<any[]>(FEATURED_STORES_FALLBACK)
   const [dbCategories, setDbCategories] = useState<any[]>([])
-  const [popularProducts, setPopularProducts] = useState<any[]>([])
+  const [popularProducts, setPopularProducts] = useState<any[]>(DEFAULT_GROCERY_PRODUCTS)
   const [refreshing, setRefreshing] = useState(false)
   const [activeBannerIndex, setActiveBannerIndex] = useState(0)
   const [addedToast, setAddedToast] = useState<string | null>(null)
@@ -182,6 +182,10 @@ export default function Index() {
     }
   }, [])
 
+  useEffect(() => {
+    fetchHomeData()
+  }, [fetchHomeData])
+
   useFocusEffect(
     useCallback(() => {
       fetchHomeData()
@@ -258,20 +262,6 @@ export default function Index() {
   const tabHeight = 70
   const cartPillBottomOffset = tabBottomOffset + tabHeight + 10
   const listPaddingBottom = tabHeight + 40
-
-  if (banners === null) {
-    return (
-      <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
-        <View className="flex-between flex-row w-full my-5 px-5">
-          <DeliverTo />
-          <CartButton />
-        </View>
-        <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color="#53B175" />
-        </View>
-      </SafeAreaView>
-    )
-  }
 
   return (
     <View className="flex-1 bg-white relative" style={{ backgroundColor: '#ffffff' }}>
