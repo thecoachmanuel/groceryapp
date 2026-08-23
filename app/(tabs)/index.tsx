@@ -79,7 +79,7 @@ const FEATURED_STORES_FALLBACK = [
 
 export default function Index() {
   const router = useRouter()
-  const { user } = useAuthStore()
+  const { user, isAuthenticated, role } = useAuthStore()
   const { addItem } = useCartStore()
 
   const { latitude, longitude } = useLocationStore()
@@ -296,9 +296,40 @@ export default function Index() {
           >
             <View className="w-full max-w-5xl mx-auto">
               {/* Header */}
-              <View className="flex-between flex-row w-full my-5 px-5">
+              <View className="flex-between flex-row items-center w-full my-4 px-5">
                 <DeliverTo />
-                <CartButton />
+
+                <View className="flex-row items-center gap-x-2">
+                  {isAuthenticated ? (
+                    <TouchableOpacity
+                      onPress={() =>
+                        router.push(
+                          role === 'admin'
+                            ? ('/admin/dashboard' as any)
+                            : role === 'seller'
+                            ? ('/seller/dashboard' as any)
+                            : ('/(tabs)/profile' as any)
+                        )
+                      }
+                      className="bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-full flex-row items-center"
+                    >
+                      <Text className="text-xs mr-1">👤</Text>
+                      <Text className="text-xs font-quicksand-bold text-primary max-w-[100px]" numberOfLines={1}>
+                        {user?.name ? user.name.split(' ')[0] : 'Account'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => router.push('/sign-in' as any)}
+                      className="bg-primary px-3.5 py-1.5 rounded-full flex-row items-center shadow-sm active:scale-95"
+                      style={{ backgroundColor: '#53B175' }}
+                    >
+                      <Text className="text-xs font-quicksand-bold text-white">Sign In</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <CartButton />
+                </View>
               </View>
 
               {/* ── SECTION 1: AUTO-SCROLLING BANNER CAROUSEL ── */}

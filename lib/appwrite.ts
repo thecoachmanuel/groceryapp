@@ -1,5 +1,6 @@
 import { CreateUserParams, GetMenuParams, SignInParams } from '@/type'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { Platform } from 'react-native'
 import {
   Account,
   Avatars,
@@ -37,7 +38,10 @@ export const client = new Client()
 client
   .setEndpoint(appwriteConfig.endpoint)
   .setProject(appwriteConfig.projectId)
-  .setPlatform(appwriteConfig.platform)
+
+if (Platform.OS !== 'web') {
+  client.setPlatform(appwriteConfig.platform)
+}
 
 export const account = new Account(client)
 export const databases = new Databases(client)

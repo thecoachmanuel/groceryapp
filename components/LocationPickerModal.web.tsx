@@ -5,6 +5,7 @@ import {
   FlatList,
   Image,
   Modal,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
@@ -14,8 +15,19 @@ import { useLocationStore } from '@/store/location.store'
 import { images } from '@/constants'
 
 const DEFAULT_COORDS = { latitude: 6.5244, longitude: 3.3792 }
-const SEARCH_DEBOUNCE_MS = 350
+const SEARCH_DEBOUNCE_MS = 300
 const GOOGLE_MAPS_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyBApA5GvxiEjCOHAoxfEPwwRDp0Djvifrs'
+
+const POPULAR_LOCATIONS = [
+  { name: 'Lekki Phase 1, Lagos', coords: { latitude: 6.4474, longitude: 3.4723 } },
+  { name: 'Victoria Island, Lagos', coords: { latitude: 6.4281, longitude: 3.4219 } },
+  { name: 'Ikeja GRA, Lagos', coords: { latitude: 6.5922, longitude: 3.3564 } },
+  { name: 'Yaba, Lagos', coords: { latitude: 6.5095, longitude: 3.3711 } },
+  { name: 'Surulere, Lagos', coords: { latitude: 6.4979, longitude: 3.3592 } },
+  { name: 'Wuse 2, Abuja', coords: { latitude: 9.0765, longitude: 7.4721 } },
+  { name: 'Garki, Abuja', coords: { latitude: 9.0333, longitude: 7.4833 } },
+  { name: 'Port Harcourt GRA, Rivers', coords: { latitude: 4.8156, longitude: 7.0498 } },
+]
 
 interface LocationPickerModalProps {
   visible: boolean
@@ -54,7 +66,7 @@ export default function LocationPickerModal({
   }, [visible, latitude, longitude, address])
 
   useEffect(() => {
-    if (search.trim().length < 3) {
+    if (search.trim().length < 2) {
       setPredictions([])
       return
     }
@@ -71,67 +83,52 @@ export default function LocationPickerModal({
         async (position) => {
           const lat = position.coords.latitude
           const lng = position.coords.longitude
-          setCurrentCoords({ latitude: lat, longitude: lng })
-          await reverseGeocodeWithGoogle(lat, lng)
+          const coords = { latitude: lat, longitude: lng }
+          setCurrentCoords(coords)
+          await reverseGeocode(lat, lng)
           setIsLocatingUser(false)
         },
         (error) => {
           setIsLocatingUser(false)
-          Alert.alert('Location Notice', 'Could not get current GPS position. You can search your address directly.')
+          Alert.alert('Location Notice', 'Could not access browser GPS. Please select an area below or search manually.')
         },
-        { timeout: 10000, enableHighAccuracy: true }
+        { timeout: 8000, enableHighAccuracy: true }
       )
     } else {
-      Alert.alert('Location Not Supported', 'Browser geolocation is not available.')
+      Alert.alert('Notice', 'Browser geolocation is not available on this device.')
     }
   }
 
-  const reverseGeocodeWithGoogle = async (lat: number, lng: number) => {
+  const reverseGeocode = async (lat: number, lng: number) => {
     try {
       const resp = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_KEY}`
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+        { headers: { 'User-Agent': 'GroceryApp/1.0' } }
       )
       const data = await resp.json()
-      if (data.results && data.results.length > 0) {
-        const formatted = data.results[0].formatted_address
-        setSelectedAddress(formatted)
+      if (data && data.display_name) {
+        const parts = data.display_name.split(',').map((p: string) => p.trim())
+        const shortAddr = parts.slice(0, 4).join(', ')
+        setSelectedAddress(shortAddr || data.display_name)
         return
       }
-      setSelectedAddress(`${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+      setSelectedAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`)
     } catch {
-      setSelectedAddress(`${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+      setSelectedAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`)
     }
   }
 
   const fetchPredictions = async (queryText: string) => {
     try {
       setIsSearching(true)
-      // Use Google Maps Geocoding API for accurate search
       const resp = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
           queryText
-        )}&key=${GOOGLE_MAPS_KEY}`
+        )}&format=json&addressdetails=1&limit=6`,
+        { headers: { 'User-Agent': 'GroceryApp/1.0' } }
       )
       const data = await resp.json()
-      if (data.results && data.results.length > 0) {
-        setPredictions(
-          data.results.map((r: any) => ({
-            display_name: r.formatted_address,
-            lat: r.geometry.location.lat,
-            lon: r.geometry.location.lng,
-          }))
-        )
-      } else {
-        // Fallback to OpenStreetMap if Google returns no results
-        const fallbackResp = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
-            queryText
-          )}&format=json&addressdetails=1&limit=5`,
-          { headers: { 'User-Agent': 'GroceryApp/1.0' } }
-        )
-        const fallbackData = await fallbackResp.json()
-        setPredictions(fallbackData || [])
-      }
+      setPredictions(data || [])
     } catch {
       setPredictions([])
     } finally {
@@ -145,7 +142,16 @@ export default function LocationPickerModal({
     if (isNaN(lat) || isNaN(lng)) return
     const coords = { latitude: lat, longitude: lng }
     setCurrentCoords(coords)
-    setSelectedAddress(place.display_name)
+    const parts = place.display_name.split(',').map((p: string) => p.trim())
+    const shortAddr = parts.slice(0, 4).join(', ')
+    setSelectedAddress(shortAddr || place.display_name)
+    setPredictions([])
+    setSearch('')
+  }
+
+  const handleSelectPopular = (loc: typeof POPULAR_LOCATIONS[0]) => {
+    setCurrentCoords(loc.coords)
+    setSelectedAddress(loc.name)
     setPredictions([])
     setSearch('')
   }
@@ -170,14 +176,14 @@ export default function LocationPickerModal({
 
   const mapEmbedUrl = `https://www.google.com/maps/embed/v1/place?key=${GOOGLE_MAPS_KEY}&q=${encodeURIComponent(
     selectedAddress || `${currentCoords.latitude},${currentCoords.longitude}`
-  )}&zoom=15`
+  )}&zoom=14`
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View className="flex-1 bg-white">
         {/* Header Bar */}
-        <View className="pt-10 pb-3 px-5 border-b-2 border-primary/10 flex-row items-center justify-between bg-white z-10">
-          <TouchableOpacity onPress={onClose} activeOpacity={0.7} className="p-1">
+        <View className="pt-10 pb-3 px-5 border-b-2 border-primary/10 flex-row items-center justify-between bg-white z-10 max-w-2xl w-full mx-auto">
+          <TouchableOpacity onPress={onClose} activeOpacity={0.7} className="p-2 -ml-2">
             <Image source={images.arrowBack} className="size-5" resizeMode="contain" />
           </TouchableOpacity>
 
@@ -185,47 +191,45 @@ export default function LocationPickerModal({
             <Text className="text-lg font-quicksand-bold text-dark-100">
               Select Delivery Location
             </Text>
-            {titleNote ? (
-              <Text className="text-xs font-quicksand-medium text-primary">{titleNote}</Text>
-            ) : (
-              <Text className="text-xs font-quicksand-medium text-gray-400">
-                Google Map Location Picker
-              </Text>
-            )}
+            <Text className="text-xs font-quicksand-medium text-gray-400">
+              {titleNote || 'Search, tap popular zone, or use GPS'}
+            </Text>
           </View>
 
-          <View className="size-5" />
+          <TouchableOpacity onPress={onClose} className="p-1">
+            <Text className="text-gray-400 font-bold text-sm">✕</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Search Bar Input */}
         <View className="p-4 bg-white z-20 shadow-sm border-b-2 border-primary/10 max-w-2xl w-full mx-auto">
-          <View className="flex-row items-center bg-white border-2 border-primary/15 rounded-full px-4 py-2.5 shadow-md shadow-black/10">
+          <View className="flex-row items-center bg-gray-50 border-2 border-primary/15 rounded-full px-4 py-2.5 shadow-sm">
             <Text className="text-base mr-2">🔍</Text>
             <TextInput
-              placeholder="Search address, landmark, area or city..."
+              placeholder="Search street, area, estate, city..."
               value={search}
               onChangeText={setSearch}
               placeholderTextColor="#9CA3AF"
-              className="flex-1 font-quicksand-semibold text-sm text-dark-100"
+              className="flex-1 font-quicksand-semibold text-sm text-dark-100 outline-none"
             />
-            {isSearching && <ActivityIndicator size="small" color="#53B175" />}
-            {search.length > 0 && !isSearching && (
+            {isSearching && <ActivityIndicator size="small" color="#53B175" className="mr-1" />}
+            {search.length > 0 && (
               <TouchableOpacity onPress={() => { setSearch(''); setPredictions([]); }}>
-                <Text className="text-gray-400 font-bold px-1">✕</Text>
+                <Text className="text-gray-400 font-bold px-2">✕</Text>
               </TouchableOpacity>
             )}
           </View>
 
           {/* Autocomplete Predictions Dropdown */}
           {predictions.length > 0 && (
-            <View className="mt-2 bg-white rounded-2xl border-2 border-primary/15 overflow-hidden shadow-2xl z-30">
+            <View className="mt-2 bg-white rounded-2xl border-2 border-primary/15 overflow-hidden shadow-2xl z-30 max-h-56">
               <FlatList
                 data={predictions}
                 keyExtractor={(_, index) => index.toString()}
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     onPress={() => handleSelectPrediction(item)}
-                    className="p-3.5 border-b border-gray-100 flex-row items-center hover:bg-gray-50"
+                    className="p-3 border-b border-gray-100 flex-row items-center active:bg-primary/10"
                   >
                     <Text className="text-base mr-2">📍</Text>
                     <Text className="flex-1 font-quicksand-medium text-xs text-dark-100">
@@ -236,17 +240,46 @@ export default function LocationPickerModal({
               />
             </View>
           )}
+
+          {/* Quick Popular Zones */}
+          <View className="mt-3">
+            <Text className="text-[11px] font-quicksand-bold text-gray-400 uppercase tracking-wider mb-2">
+              Popular Delivery Hubs:
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+              {POPULAR_LOCATIONS.map((loc, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  onPress={() => handleSelectPopular(loc)}
+                  className={`mr-2 px-3 py-1.5 rounded-full border ${
+                    selectedAddress === loc.name
+                      ? 'bg-primary border-primary'
+                      : 'bg-white border-gray-200'
+                  }`}
+                  style={selectedAddress === loc.name ? { backgroundColor: '#53B175', borderColor: '#53B175' } : {}}
+                >
+                  <Text
+                    className={`text-xs font-quicksand-bold ${
+                      selectedAddress === loc.name ? 'text-white' : 'text-dark-100'
+                    }`}
+                  >
+                    📍 {loc.name.split(',')[0]}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
         </View>
 
         {/* Google Map Interactive Frame */}
-        <View className="flex-1 w-full bg-gray-100 relative p-4 max-w-3xl mx-auto">
+        <View className="flex-1 w-full bg-gray-100 relative p-4 max-w-2xl mx-auto">
           <View className="flex-1 w-full rounded-3xl overflow-hidden border-2 border-primary/20 shadow-md shadow-black/10">
             <iframe
-              title="Google Map"
+              title="Google Map Location"
               src={mapEmbedUrl}
               width="100%"
               height="100%"
-              style={{ border: 0, minHeight: 300, width: '100%', height: '100%' }}
+              style={{ border: 0, minHeight: 240, width: '100%', height: '100%' }}
               loading="lazy"
               allowFullScreen
             />
@@ -256,14 +289,14 @@ export default function LocationPickerModal({
           <TouchableOpacity
             onPress={fetchGPSLocation}
             disabled={isLocatingUser}
-            className="absolute bottom-8 right-8 bg-white border-2 border-primary/30 px-4 py-2.5 rounded-full flex-row items-center shadow-lg shadow-black/15 active:scale-95"
+            className="absolute bottom-7 right-7 bg-white border-2 border-primary/40 px-4 py-2.5 rounded-full flex-row items-center shadow-xl active:scale-95"
           >
             {isLocatingUser ? (
               <ActivityIndicator size="small" color="#53B175" className="mr-2" />
             ) : (
               <Text className="text-base mr-2">🎯</Text>
             )}
-            <Text className="text-primary font-quicksand-bold text-xs">
+            <Text className="text-primary font-quicksand-bold text-xs" style={{ color: '#53B175' }}>
               Detect GPS
             </Text>
           </TouchableOpacity>
@@ -277,7 +310,7 @@ export default function LocationPickerModal({
             </View>
             <View className="flex-1">
               <Text className="text-xs font-quicksand-semibold text-gray-400 uppercase tracking-wider">
-                Delivery Address Selected
+                Selected Address
               </Text>
               <Text
                 className="text-sm font-quicksand-bold text-dark-100 mt-0.5"
@@ -294,14 +327,14 @@ export default function LocationPickerModal({
               onPress={() => handleSaveAsLabel('Home')}
               className="flex-1 bg-primary/10 border border-primary/30 py-2.5 rounded-full items-center"
             >
-              <Text className="text-primary font-quicksand-bold text-xs">🏠 Save as Home</Text>
+              <Text className="text-primary font-quicksand-bold text-xs" style={{ color: '#53B175' }}>🏠 Save as Home</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => handleSaveAsLabel('Work')}
               className="flex-1 bg-primary/10 border border-primary/30 py-2.5 rounded-full items-center"
             >
-              <Text className="text-primary font-quicksand-bold text-xs">💼 Save as Work</Text>
+              <Text className="text-primary font-quicksand-bold text-xs" style={{ color: '#53B175' }}>💼 Save as Work</Text>
             </TouchableOpacity>
           </View>
 
@@ -311,7 +344,7 @@ export default function LocationPickerModal({
             style={{ backgroundColor: '#53B175' }}
           >
             <Text className="text-white font-quicksand-bold text-base">
-              Confirm Delivery Location
+              Set Delivery Location
             </Text>
           </TouchableOpacity>
         </View>
