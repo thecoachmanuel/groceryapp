@@ -15,7 +15,7 @@ Sentry.init({
 });
 
 import { useState } from 'react';
-import { Animated, ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, ActivityIndicator, Image, Platform, Text, TouchableOpacity, View } from 'react-native';
 import { subscribeToOrders } from "@/lib/appwrite";
 import { images } from "@/constants";
 import useBrandingStore from "@/store/branding.store";
@@ -46,7 +46,7 @@ export default Sentry.wrap(function RootLayout() {
 
   useEffect(() => {
     async function checkForOTAUpdates() {
-      if (__DEV__) return
+      if (__DEV__ || Platform.OS === 'web') return
       try {
         const update = await Updates.checkForUpdateAsync()
         if (update.isAvailable) {
@@ -58,6 +58,14 @@ export default Sentry.wrap(function RootLayout() {
       }
     }
     checkForOTAUpdates()
+  }, [])
+
+  // Web & Mobile Loading Safety Guard: Prevent indefinite splash screen hanging
+  useEffect(() => {
+    const safetyTimer = setTimeout(() => {
+      useAuthStore.getState().setLoading(false)
+    }, 2500)
+    return () => clearTimeout(safetyTimer)
   }, [])
 
   useEffect(() => {
