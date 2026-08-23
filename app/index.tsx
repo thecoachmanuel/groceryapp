@@ -1,3 +1,5 @@
-import Index from './(tabs)/index'
+import { Redirect } from 'expo-router'
 
-export default Index
+export default function RootIndex() {
+  return <Redirect href="/(tabs)" />
+}

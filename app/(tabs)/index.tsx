@@ -21,14 +21,11 @@ import {
   ScrollView,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
   Platform,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window')
-const EFFECTIVE_WIDTH = Platform.OS === 'web' ? Math.min(SCREEN_WIDTH, 480) : SCREEN_WIDTH
-const CAROUSEL_CARD_WIDTH = EFFECTIVE_WIDTH - 40 // Padding 20 on each side
 
 // Categories fallback with emoji icons for horizontal scroll
 const HOME_CATEGORIES = [
@@ -261,6 +258,10 @@ export default function Index() {
     ? Math.max(insets.bottom || 0, 12)
     : (insets.bottom > 0 ? insets.bottom : 0)
   const tabHeight = 70
+  const { width: windowWidth } = useWindowDimensions()
+  const isDesktop = windowWidth >= 768
+  const bannerContainerWidth = isDesktop ? Math.min(windowWidth - 32, 640) : windowWidth
+  const productItemWidth = windowWidth >= 1024 ? '23.5%' : windowWidth >= 640 ? '31.8%' : '48%'
   const cartPillBottomOffset = tabBottomOffset + tabHeight + 10
   const listPaddingBottom = tabHeight + 40
 
@@ -273,7 +274,7 @@ export default function Index() {
         <SafeAreaView edges={['top']} className="flex-1">
           {/* Toast Feedback for 1-Tap Add to Cart */}
           {addedToast && (
-            <View className="absolute top-14 left-5 right-5 bg-dark-100/95 py-3 px-5 rounded-2xl z-50 shadow-xl border border-primary/30 flex-row items-center justify-between">
+            <View className="absolute top-14 left-5 right-5 bg-dark-100/95 py-3 px-5 rounded-2xl z-50 shadow-xl border border-primary/30 flex-row items-center justify-between max-w-xl mx-auto">
               <Text className="text-white font-quicksand-bold text-xs">{addedToast}</Text>
               <TouchableOpacity onPress={() => setAddedToast(null)}>
                 <Text className="text-gray-400 font-bold text-xs ml-2">✕</Text>
@@ -293,295 +294,297 @@ export default function Index() {
               />
             }
           >
-            {/* Header */}
-            <View className="flex-between flex-row w-full my-5 px-5">
-              <DeliverTo />
-              <CartButton />
-            </View>
+            <View className="w-full max-w-5xl mx-auto">
+              {/* Header */}
+              <View className="flex-between flex-row w-full my-5 px-5">
+                <DeliverTo />
+                <CartButton />
+              </View>
 
-            {/* ── SECTION 1: AUTO-SCROLLING BANNER CAROUSEL ── */}
-            <View className="mb-6">
-              <FlatList
-                ref={carouselRef}
-                data={banners}
-                horizontal
-                pagingEnabled
-                decelerationRate="fast"
-                showsHorizontalScrollIndicator={false}
-                keyExtractor={(item, index) => (item.id ? item.id.toString() : index.toString())}
-                onMomentumScrollEnd={(e) => {
-                  const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH)
-                  setActiveBannerIndex(index)
-                }}
-                renderItem={({ item, index }) => {
-                  const isEven = index % 2 === 0
-                  const imageSrc = item.image || (item.imageUrl ? { uri: item.imageUrl } : null)
+              {/* ── SECTION 1: AUTO-SCROLLING BANNER CAROUSEL ── */}
+              <View className="mb-6 w-full items-center">
+                <FlatList
+                  ref={carouselRef}
+                  data={banners}
+                  horizontal
+                  pagingEnabled
+                  decelerationRate="fast"
+                  showsHorizontalScrollIndicator={false}
+                  keyExtractor={(item, index) => (item.id ? item.id.toString() : index.toString())}
+                  onMomentumScrollEnd={(e) => {
+                    const index = Math.round(e.nativeEvent.contentOffset.x / bannerContainerWidth)
+                    setActiveBannerIndex(index)
+                  }}
+                  style={{ width: bannerContainerWidth }}
+                  renderItem={({ item, index }) => {
+                    const isEven = index % 2 === 0
+                    const imageSrc = item.image || (item.imageUrl ? { uri: item.imageUrl } : null)
 
-                  return (
-                    <Pressable
-                      onPress={() => handleBannerPress(item)}
-                      android_ripple={{ color: '#ffffff22' }}
-                      style={{ width: SCREEN_WIDTH, paddingHorizontal: 20 }}
-                    >
-                      <LinearGradient
-                        colors={item.gradient as [string, string]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={{
-                          borderRadius: 24,
-                          flexDirection: 'row',
-                          padding: 18,
-                          height: 185,
-                          overflow: 'hidden',
-                        }}
+                    return (
+                      <Pressable
+                        onPress={() => handleBannerPress(item)}
+                        android_ripple={{ color: '#ffffff22' }}
+                        style={{ width: bannerContainerWidth, paddingHorizontal: 16 }}
                       >
-                        {isEven ? (
-                          <>
-                            <View className="w-1/2 justify-center items-start pr-3">
-                              {imageSrc && (
-                                <Image
-                                  source={imageSrc}
-                                  className="w-full h-full"
-                                  style={{ maxHeight: '100%', flex: 1 }}
-                                  resizeMode="contain"
-                                />
-                              )}
-                            </View>
-                            <View className="w-1/2 justify-center items-end pl-3">
-                              <Text className="text-3xl font-quicksand-bold text-white mb-1 text-right">
-                                {item.title}
-                              </Text>
-                              {item.subtitle ? (
-                                <Text className="text-xs font-quicksand-medium text-white/80 mb-3 text-right">
-                                  {item.subtitle}
-                                </Text>
-                              ) : null}
-                              <TouchableOpacity
-                                onPress={() => handleBannerPress(item)}
-                                className="bg-white/30 px-5 py-2 rounded-full mt-1"
-                              >
-                                <Text className="text-sm font-quicksand-bold text-white">
-                                  Order Now
-                                </Text>
-                              </TouchableOpacity>
-                            </View>
-                          </>
-                        ) : (
-                          <>
-                            <View className="w-1/2 justify-center items-start pr-3">
-                              <Text className="text-3xl font-quicksand-bold text-white mb-1 text-left">
-                                {item.title}
-                              </Text>
-                              {item.subtitle ? (
-                                <Text className="text-xs font-quicksand-medium text-white/80 mb-3 text-left">
-                                  {item.subtitle}
-                                </Text>
-                              ) : null}
-                              <TouchableOpacity
-                                onPress={() => handleBannerPress(item)}
-                                className="bg-white/30 px-5 py-2 rounded-full mt-1"
-                              >
-                                <Text className="text-sm font-quicksand-bold text-white">
-                                  Order Now
-                                </Text>
-                              </TouchableOpacity>
-                            </View>
-                            <View className="w-1/2 justify-center items-end pl-3">
-                              {imageSrc && (
-                                <Image
-                                  source={imageSrc}
-                                  className="w-full h-full"
-                                  style={{ maxHeight: '100%', flex: 1 }}
-                                  resizeMode="contain"
-                                />
-                              )}
-                            </View>
-                          </>
-                        )}
-                      </LinearGradient>
-                    </Pressable>
-                  )
-                }}
-              />
-
-              {/* Carousel Active Pagination Dots */}
-              {banners.length > 1 && (
-                <View className="flex-row justify-center items-center mt-3 gap-1.5">
-                  {banners.map((_, i) => (
-                    <View
-                      key={i}
-                      className={`h-2 rounded-full ${activeBannerIndex === i ? 'w-6 bg-primary' : 'w-2 bg-gray-300'
-                        }`}
-                      style={activeBannerIndex === i ? { backgroundColor: '#53B175' } : {}}
-                    />
-                  ))}
-                </View>
-              )}
-            </View>
-
-            {/* ── SECTION 2: CATEGORIES HORIZONTAL SCROLL BAR ── */}
-            <View className="mb-6 px-5">
-              <View className="flex-between flex-row items-center mb-3">
-                <Text className="text-lg font-quicksand-bold text-dark-100">Explore Categories</Text>
-                <TouchableOpacity onPress={() => router.push('/(tabs)/search')}>
-                  <Text className="text-xs font-quicksand-bold text-primary" style={{ color: '#53B175' }}>See All →</Text>
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row py-1">
-                {categoriesToDisplay.map((cat) => (
-                  <TouchableOpacity
-                    key={cat.id}
-                    activeOpacity={0.85}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/(tabs)/search',
-                        params: cat.name === 'All' ? {} : { category: cat.name },
-                      } as any)
-                    }
-                    className="bg-white border-2 border-primary/10 rounded-[24px] p-3.5 mr-3 w-28 items-center justify-center shadow-md shadow-black/5 active:scale-95"
-                  >
-                    <View className="w-12 h-12 rounded-2xl bg-primary/10 items-center justify-center mb-2 border border-primary/20 overflow-hidden">
-                      {cat.image ? (
-                        <Image
-                          source={{ uri: cat.image }}
-                          className="w-full h-full"
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <Text className="text-2xl">{cat.icon}</Text>
-                      )}
-                    </View>
-                    <Text className="font-quicksand-bold text-xs text-dark-100 text-center" numberOfLines={1}>
-                      {cat.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-
-
-
-            {/* ── SECTION 4: SHOP FROM STORES (LOCATION PROXIMITY INTELLIGENCE) ── */}
-            <View className="mb-6 px-5">
-              <View className="flex-between flex-row items-center mb-3">
-                <View>
-                  <Text className="text-lg font-quicksand-bold text-dark-100">
-                    Stores Near You 📍
-                  </Text>
-                  <Text className="text-xs font-quicksand-medium text-gray-400">
-                    Sorted by proximity to your current location
-                  </Text>
-                </View>
-                <TouchableOpacity onPress={() => router.push('/stores' as any)}>
-                  <Text className="text-xs font-quicksand-bold text-primary" style={{ color: '#53B175' }}>Explore All →</Text>
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {sortedStores.map((store, idx) => {
-                  const storeId = String(store.$id || store.id || `store_${idx + 1}`)
-                  const openStore = () => {
-                    router.push({
-                      pathname: '/store/[id]',
-                      params: { id: storeId },
-                    })
-                  }
-
-                  return (
-                    <TouchableOpacity
-                      key={storeId || idx}
-                      activeOpacity={0.85}
-                      onPress={openStore}
-                      className="bg-white border-2 border-primary/10 rounded-[24px] p-4 mr-4 w-64 shadow-md shadow-black/5 justify-between"
-                    >
-                      <View>
-                        <View className="flex-row items-center justify-between mb-2">
-                          {(() => {
-                            const logoSrc = store.logoUrl || store.logoImage || store.logo || store.image || store.avatar || null
-                            const initial = (store.storeName || 'S').charAt(0).toUpperCase()
-                            return (
-                              <View className="w-12 h-12 rounded-2xl bg-primary/10 border-2 border-primary/20 items-center justify-center overflow-hidden shadow-sm">
-                                {logoSrc ? (
-                                  <FastImage
-                                    source={logoSrc}
+                        <LinearGradient
+                          colors={item.gradient as [string, string]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={{
+                            borderRadius: 24,
+                            flexDirection: 'row',
+                            padding: 18,
+                            height: 185,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {isEven ? (
+                            <>
+                              <View className="w-1/2 justify-center items-start pr-3">
+                                {imageSrc && (
+                                  <Image
+                                    source={imageSrc}
                                     className="w-full h-full"
-                                    style={{ width: '100%', height: '100%' }}
-                                    contentFit="cover"
+                                    style={{ maxHeight: '100%', flex: 1 }}
+                                    resizeMode="contain"
                                   />
-                                ) : (
-                                  <Text className="text-xl font-quicksand-bold text-primary" style={{ color: '#53B175' }}>
-                                    {initial}
-                                  </Text>
                                 )}
                               </View>
-                            )
-                          })()}
+                              <View className="w-1/2 justify-center items-end pl-3">
+                                <Text className="text-2xl md:text-3xl font-quicksand-bold text-white mb-1 text-right">
+                                  {item.title}
+                                </Text>
+                                {item.subtitle ? (
+                                  <Text className="text-xs font-quicksand-medium text-white/80 mb-3 text-right">
+                                    {item.subtitle}
+                                  </Text>
+                                ) : null}
+                                <TouchableOpacity
+                                  onPress={() => handleBannerPress(item)}
+                                  className="bg-white/30 px-5 py-2 rounded-full mt-1"
+                                >
+                                  <Text className="text-sm font-quicksand-bold text-white">
+                                    Order Now
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+                            </>
+                          ) : (
+                            <>
+                              <View className="w-1/2 justify-center items-start pr-3">
+                                <Text className="text-2xl md:text-3xl font-quicksand-bold text-white mb-1 text-left">
+                                  {item.title}
+                                </Text>
+                                {item.subtitle ? (
+                                  <Text className="text-xs font-quicksand-medium text-white/80 mb-3 text-left">
+                                    {item.subtitle}
+                                  </Text>
+                                ) : null}
+                                <TouchableOpacity
+                                  onPress={() => handleBannerPress(item)}
+                                  className="bg-white/30 px-5 py-2 rounded-full mt-1"
+                                >
+                                  <Text className="text-sm font-quicksand-bold text-white">
+                                    Order Now
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+                              <View className="w-1/2 justify-center items-end pl-3">
+                                {imageSrc && (
+                                  <Image
+                                    source={imageSrc}
+                                    className="w-full h-full"
+                                    style={{ maxHeight: '100%', flex: 1 }}
+                                    resizeMode="contain"
+                                  />
+                                )}
+                              </View>
+                            </>
+                          )}
+                        </LinearGradient>
+                      </Pressable>
+                    )
+                  }}
+                />
 
-                          <View className="flex-row items-center bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full">
-                            <Text className="text-xs mr-1">⭐</Text>
-                            <Text className="font-quicksand-bold text-xs text-amber-700">
-                              {store.rating || 4.9}
-                            </Text>
-                          </View>
-                        </View>
+                {/* Carousel Active Pagination Dots */}
+                {banners.length > 1 && (
+                  <View className="flex-row justify-center items-center mt-3 gap-1.5">
+                    {banners.map((_, i) => (
+                      <View
+                        key={i}
+                        className={`h-2 rounded-full ${activeBannerIndex === i ? 'w-6 bg-primary' : 'w-2 bg-gray-300'
+                          }`}
+                        style={activeBannerIndex === i ? { backgroundColor: '#53B175' } : {}}
+                      />
+                    ))}
+                  </View>
+                )}
+              </View>
 
-                        <Text className="font-quicksand-bold text-dark-100 text-sm" numberOfLines={1}>
-                          {store.storeName || 'Partner Store'}
-                        </Text>
-                        <Text className="text-gray-400 font-quicksand-medium text-xs mt-1" numberOfLines={2}>
-                          {store.description || 'Quality grocery & daily essentials store'}
-                        </Text>
+              {/* ── SECTION 2: CATEGORIES HORIZONTAL SCROLL BAR ── */}
+              <View className="mb-6 px-5">
+                <View className="flex-between flex-row items-center mb-3">
+                  <Text className="text-lg font-quicksand-bold text-dark-100">Explore Categories</Text>
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/search')}>
+                    <Text className="text-xs font-quicksand-bold text-primary" style={{ color: '#53B175' }}>See All →</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row py-1">
+                  {categoriesToDisplay.map((cat) => (
+                    <TouchableOpacity
+                      key={cat.id}
+                      activeOpacity={0.85}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/(tabs)/search',
+                          params: cat.name === 'All' ? {} : { category: cat.name },
+                        } as any)
+                      }
+                      className="bg-white border-2 border-primary/10 rounded-[24px] p-3.5 mr-3 w-28 items-center justify-center shadow-md shadow-black/5 active:scale-95"
+                    >
+                      <View className="w-12 h-12 rounded-2xl bg-primary/10 items-center justify-center mb-2 border border-primary/20 overflow-hidden">
+                        {cat.image ? (
+                          <Image
+                            source={{ uri: cat.image }}
+                            className="w-full h-full"
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <Text className="text-2xl">{cat.icon}</Text>
+                        )}
                       </View>
+                      <Text className="font-quicksand-bold text-xs text-dark-100 text-center" numberOfLines={1}>
+                        {cat.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
 
-                      <View className="mt-4 pt-3 border-t border-primary/10 flex-row items-center justify-between">
-                        <View className="bg-primary/10 border border-primary/20 px-2.5 py-0.5 rounded-full flex-row items-center">
-                          <Text className="text-[10px] font-quicksand-bold text-primary" style={{ color: '#53B175' }}>
-                            📍 {store.distanceKm != null ? `${store.distanceKm} km` : 'Near you'}
+              {/* ── SECTION 4: SHOP FROM STORES (LOCATION PROXIMITY INTELLIGENCE) ── */}
+              <View className="mb-6 px-5">
+                <View className="flex-between flex-row items-center mb-3">
+                  <View>
+                    <Text className="text-lg font-quicksand-bold text-dark-100">
+                      Stores Near You 📍
+                    </Text>
+                    <Text className="text-xs font-quicksand-medium text-gray-400">
+                      Sorted by closest distance to your delivery location
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => router.push('/stores' as any)}>
+                    <Text className="text-xs font-quicksand-bold text-primary" style={{ color: '#53B175' }}>
+                      All Stores →
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row py-1">
+                  {sortedStores.map((store: any, idx: number) => {
+                    const storeId = store.$id || store.id
+                    const openStore = () => {
+                      if (storeId) {
+                        router.push(`/store/${storeId}` as any)
+                      }
+                    }
+
+                    return (
+                      <TouchableOpacity
+                        key={storeId || idx}
+                        activeOpacity={0.85}
+                        onPress={openStore}
+                        className="bg-white border-2 border-primary/10 rounded-[24px] p-4 mr-4 w-64 shadow-md shadow-black/5 justify-between"
+                      >
+                        <View>
+                          <View className="flex-row items-center justify-between mb-2">
+                            {(() => {
+                              const logoSrc = store.logoUrl || store.logoImage || store.logo || store.image || store.avatar || null
+                              const initial = (store.storeName || 'S').charAt(0).toUpperCase()
+                              return (
+                                <View className="w-12 h-12 rounded-2xl bg-primary/10 border-2 border-primary/20 items-center justify-center overflow-hidden shadow-sm">
+                                  {logoSrc ? (
+                                    <FastImage
+                                      source={logoSrc}
+                                      className="w-full h-full"
+                                      style={{ width: '100%', height: '100%' }}
+                                      contentFit="cover"
+                                    />
+                                  ) : (
+                                    <Text className="text-xl font-quicksand-bold text-primary" style={{ color: '#53B175' }}>
+                                      {initial}
+                                    </Text>
+                                  )}
+                                </View>
+                              )
+                            })()}
+
+                            <View className="flex-row items-center bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full">
+                              <Text className="text-xs mr-1">⭐</Text>
+                              <Text className="font-quicksand-bold text-xs text-amber-700">
+                                {store.rating || 4.9}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <Text className="font-quicksand-bold text-dark-100 text-sm" numberOfLines={1}>
+                            {store.storeName || 'Partner Store'}
+                          </Text>
+                          <Text className="text-gray-400 font-quicksand-medium text-xs mt-1" numberOfLines={2}>
+                            {store.description || 'Quality grocery & daily essentials store'}
                           </Text>
                         </View>
 
-                        <TouchableOpacity
-                          activeOpacity={0.8}
-                          onPress={(e) => {
-                            e.stopPropagation()
-                            openStore()
-                          }}
-                          className="bg-primary px-3.5 py-1.5 rounded-full flex-row items-center active:scale-95 shadow-sm shadow-primary/20"
-                          style={{ backgroundColor: '#53B175' }}
-                        >
-                          <Text className="text-white font-quicksand-bold text-xs mr-1">Visit Store</Text>
-                          <Text className="text-white font-bold text-xs">→</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </TouchableOpacity>
-                  )
-                })}
-              </ScrollView>
-            </View>
+                        <View className="mt-4 pt-3 border-t border-primary/10 flex-row items-center justify-between">
+                          <View className="bg-primary/10 border border-primary/20 px-2.5 py-0.5 rounded-full flex-row items-center">
+                            <Text className="text-[10px] font-quicksand-bold text-primary" style={{ color: '#53B175' }}>
+                              📍 {store.distanceKm != null ? `${store.distanceKm} km` : 'Near you'}
+                            </Text>
+                          </View>
 
-            {/* ── SECTION 5: POPULAR GROCERIES NEAR YOU ── */}
-            <View className="px-5 pb-8">
-              <View className="flex-between flex-row items-center mb-3">
-                <View>
-                  <Text className="text-lg font-quicksand-bold text-dark-100">
-                    Groceries Near You 🛒
-                  </Text>
-                  <Text className="text-xs font-quicksand-medium text-gray-400">
-                    Products sorted by nearest store availability
-                  </Text>
-                </View>
-                <TouchableOpacity onPress={() => router.push('/(tabs)/search')}>
-                  <Text className="text-xs font-quicksand-bold text-primary" style={{ color: '#53B175' }}>View All →</Text>
-                </TouchableOpacity>
+                          <TouchableOpacity
+                            activeOpacity={0.8}
+                            onPress={(e) => {
+                              e.stopPropagation()
+                              openStore()
+                            }}
+                            className="bg-primary px-3.5 py-1.5 rounded-full flex-row items-center active:scale-95 shadow-sm shadow-primary/20"
+                            style={{ backgroundColor: '#53B175' }}
+                          >
+                            <Text className="text-white font-quicksand-bold text-xs mr-1">Visit Store</Text>
+                            <Text className="text-white font-bold text-xs">→</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </ScrollView>
               </View>
 
-              <View className="flex-row flex-wrap justify-between gap-y-4">
-                {(sortedPopularProducts.length > 0 ? sortedPopularProducts : DEFAULT_GROCERY_PRODUCTS).slice(0, 8).map((item: any, idx: number) => (
-                  <View key={item.$id || item.id || `pop_${idx}`} style={{ width: (SCREEN_WIDTH - 52) / 2 }}>
-                    <MenuCard item={item} />
+              {/* ── SECTION 5: POPULAR GROCERIES NEAR YOU ── */}
+              <View className="px-5 pb-8">
+                <View className="flex-between flex-row items-center mb-3">
+                  <View>
+                    <Text className="text-lg font-quicksand-bold text-dark-100">
+                      Groceries Near You 🛒
+                    </Text>
+                    <Text className="text-xs font-quicksand-medium text-gray-400">
+                      Products sorted by nearest store availability
+                    </Text>
                   </View>
-                ))}
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/search')}>
+                    <Text className="text-xs font-quicksand-bold text-primary" style={{ color: '#53B175' }}>View All →</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View className="flex-row flex-wrap justify-between gap-y-4">
+                  {(sortedPopularProducts.length > 0 ? sortedPopularProducts : DEFAULT_GROCERY_PRODUCTS).slice(0, 12).map((item: any, idx: number) => (
+                    <View key={item.$id || item.id || `pop_${idx}`} style={{ width: productItemWidth }}>
+                      <MenuCard item={item} />
+                    </View>
+                  ))}
+                </View>
               </View>
             </View>
           </ScrollView>

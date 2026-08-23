@@ -10,12 +10,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import * as Location from 'expo-location'
 import { useLocationStore } from '@/store/location.store'
 import { images } from '@/constants'
 
 const DEFAULT_COORDS = { latitude: 6.5244, longitude: 3.3792 }
-const SEARCH_DEBOUNCE_MS = 400
+const SEARCH_DEBOUNCE_MS = 350
+const GOOGLE_MAPS_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyBApA5GvxiEjCOHAoxfEPwwRDp0Djvifrs'
 
 interface LocationPickerModalProps {
   visible: boolean
@@ -33,7 +33,6 @@ export default function LocationPickerModal({
   const [search, setSearch] = useState('')
   const [predictions, setPredictions] = useState<any[]>([])
   const [isSearching, setIsSearching] = useState(false)
-  const [isGeocoding, setIsGeocoding] = useState(false)
   const [isLocatingUser, setIsLocatingUser] = useState(false)
 
   const [currentCoords, setCurrentCoords] = useState<{ latitude: number; longitude: number }>({
@@ -47,11 +46,12 @@ export default function LocationPickerModal({
     if (visible) {
       if (latitude && longitude) {
         setCurrentCoords({ latitude, longitude })
-      } else {
-        fetchGPSLocation()
+      }
+      if (address) {
+        setSelectedAddress(address)
       }
     }
-  }, [visible])
+  }, [visible, latitude, longitude, address])
 
   useEffect(() => {
     if (search.trim().length < 3) {
@@ -64,85 +64,74 @@ export default function LocationPickerModal({
     return () => clearTimeout(timer)
   }, [search])
 
-  const fetchGPSLocation = async () => {
-    try {
+  const fetchGPSLocation = () => {
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
       setIsLocatingUser(true)
-      const { status } = await Location.requestForegroundPermissionsAsync()
-      if (status !== 'granted') {
-        Alert.alert(
-          'Location Access Required',
-          'Please allow location access to auto-detect your delivery address, or search manually.'
-        )
-        return
-      }
-
-      let loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      }).catch(() => null)
-
-      if (!loc) {
-        loc = await Location.getLastKnownPositionAsync().catch(() => null)
-      }
-
-      if (loc?.coords) {
-        const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude }
-        setCurrentCoords(coords)
-        await reverseGeocode(coords.latitude, coords.longitude)
-      }
-    } catch (err) {
-      console.log('GPS fetch error:', err)
-    } finally {
-      setIsLocatingUser(false)
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const lat = position.coords.latitude
+          const lng = position.coords.longitude
+          setCurrentCoords({ latitude: lat, longitude: lng })
+          await reverseGeocodeWithGoogle(lat, lng)
+          setIsLocatingUser(false)
+        },
+        (error) => {
+          setIsLocatingUser(false)
+          Alert.alert('Location Notice', 'Could not get current GPS position. You can search your address directly.')
+        },
+        { timeout: 10000, enableHighAccuracy: true }
+      )
+    } else {
+      Alert.alert('Location Not Supported', 'Browser geolocation is not available.')
     }
   }
 
-  const reverseGeocode = async (lat: number, lng: number) => {
-    setIsGeocoding(true)
+  const reverseGeocodeWithGoogle = async (lat: number, lng: number) => {
     try {
-      const [geo] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng }).catch(
-        () => [null]
+      const resp = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_KEY}`
       )
-      if (geo) {
-        const streetNumber = geo.streetNumber || ''
-        const street = geo.street || geo.name || ''
-        const streetLine = [streetNumber, street].filter(Boolean).join(' ').trim()
-
-        const district = geo.district || geo.subregion || ''
-        const city = geo.city || geo.region || ''
-        const country = geo.country || ''
-
-        const rawParts = [streetLine, district, city, country].filter(Boolean)
-        const uniqueParts: string[] = []
-        rawParts.forEach((part) => {
-          if (!uniqueParts.includes(part)) uniqueParts.push(part)
-        })
-
-        const formatted = uniqueParts.join(', ')
-        if (formatted && formatted.length > 3) {
-          setSelectedAddress(formatted)
-          return
-        }
+      const data = await resp.json()
+      if (data.results && data.results.length > 0) {
+        const formatted = data.results[0].formatted_address
+        setSelectedAddress(formatted)
+        return
       }
-
       setSelectedAddress(`${lat.toFixed(5)}, ${lng.toFixed(5)}`)
     } catch {
       setSelectedAddress(`${lat.toFixed(5)}, ${lng.toFixed(5)}`)
-    } finally {
-      setIsGeocoding(false)
     }
   }
 
   const fetchPredictions = async (queryText: string) => {
     try {
       setIsSearching(true)
+      // Use Google Maps Geocoding API for accurate search
       const resp = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
           queryText
-        )}&format=json&addressdetails=1&limit=5`,
-        { headers: { 'User-Agent': 'GroceryApp/1.0' } }
+        )}&key=${GOOGLE_MAPS_KEY}`
       )
       const data = await resp.json()
-      setPredictions(data || [])
+      if (data.results && data.results.length > 0) {
+        setPredictions(
+          data.results.map((r: any) => ({
+            display_name: r.formatted_address,
+            lat: r.geometry.location.lat,
+            lon: r.geometry.location.lng,
+          }))
+        )
+      } else {
+        // Fallback to OpenStreetMap if Google returns no results
+        const fallbackResp = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+            queryText
+          )}&format=json&addressdetails=1&limit=5`,
+          { headers: { 'User-Agent': 'GroceryApp/1.0' } }
+        )
+        const fallbackData = await fallbackResp.json()
+        setPredictions(fallbackData || [])
+      }
     } catch {
       setPredictions([])
     } finally {
@@ -157,7 +146,6 @@ export default function LocationPickerModal({
     const coords = { latitude: lat, longitude: lng }
     setCurrentCoords(coords)
     setSelectedAddress(place.display_name)
-    setIsGeocoding(false)
     setPredictions([])
     setSearch('')
   }
@@ -180,11 +168,15 @@ export default function LocationPickerModal({
     Alert.alert('Address Saved!', `Location saved as your ${label} address.`)
   }
 
+  const mapEmbedUrl = `https://www.google.com/maps/embed/v1/place?key=${GOOGLE_MAPS_KEY}&q=${encodeURIComponent(
+    selectedAddress || `${currentCoords.latitude},${currentCoords.longitude}`
+  )}&zoom=15`
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View className="flex-1 bg-white">
         {/* Header Bar */}
-        <View className="pt-12 pb-3 px-5 border-b-2 border-primary/10 flex-row items-center justify-between bg-white z-10">
+        <View className="pt-10 pb-3 px-5 border-b-2 border-primary/10 flex-row items-center justify-between bg-white z-10">
           <TouchableOpacity onPress={onClose} activeOpacity={0.7} className="p-1">
             <Image source={images.arrowBack} className="size-5" resizeMode="contain" />
           </TouchableOpacity>
@@ -197,7 +189,7 @@ export default function LocationPickerModal({
               <Text className="text-xs font-quicksand-medium text-primary">{titleNote}</Text>
             ) : (
               <Text className="text-xs font-quicksand-medium text-gray-400">
-                Search address or auto-detect location
+                Google Map Location Picker
               </Text>
             )}
           </View>
@@ -206,11 +198,11 @@ export default function LocationPickerModal({
         </View>
 
         {/* Search Bar Input */}
-        <View className="p-4 bg-white z-20 shadow-sm border-b-2 border-primary/10">
-          <View className="flex-row items-center bg-white border-2 border-primary/10 rounded-full px-4 py-2.5 shadow-md shadow-black/10">
+        <View className="p-4 bg-white z-20 shadow-sm border-b-2 border-primary/10 max-w-2xl w-full mx-auto">
+          <View className="flex-row items-center bg-white border-2 border-primary/15 rounded-full px-4 py-2.5 shadow-md shadow-black/10">
             <Text className="text-base mr-2">🔍</Text>
             <TextInput
-              placeholder="Search street, area, city or landmark..."
+              placeholder="Search address, landmark, area or city..."
               value={search}
               onChangeText={setSearch}
               placeholderTextColor="#9CA3AF"
@@ -218,22 +210,22 @@ export default function LocationPickerModal({
             />
             {isSearching && <ActivityIndicator size="small" color="#53B175" />}
             {search.length > 0 && !isSearching && (
-              <TouchableOpacity onPress={() => setSearch('')}>
-                <Text className="text-gray-400 font-bold px-2">✕</Text>
+              <TouchableOpacity onPress={() => { setSearch(''); setPredictions([]); }}>
+                <Text className="text-gray-400 font-bold px-1">✕</Text>
               </TouchableOpacity>
             )}
           </View>
 
-          {/* Autocomplete Predictions List */}
+          {/* Autocomplete Predictions Dropdown */}
           {predictions.length > 0 && (
-            <View className="bg-white rounded-3xl mt-2 border-2 border-primary/10 max-h-48 shadow-xl">
+            <View className="mt-2 bg-white rounded-2xl border-2 border-primary/15 overflow-hidden shadow-2xl z-30">
               <FlatList
                 data={predictions}
                 keyExtractor={(_, index) => index.toString()}
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     onPress={() => handleSelectPrediction(item)}
-                    className="p-3.5 border-b border-gray-100 flex-row items-center"
+                    className="p-3.5 border-b border-gray-100 flex-row items-center hover:bg-gray-50"
                   >
                     <Text className="text-base mr-2">📍</Text>
                     <Text className="flex-1 font-quicksand-medium text-xs text-dark-100">
@@ -246,59 +238,53 @@ export default function LocationPickerModal({
           )}
         </View>
 
-        {/* Web Location Display Card */}
-        <View className="flex-1 items-center justify-center p-6 bg-gray-50">
-          <View className="bg-white rounded-3xl p-6 border-2 border-primary/15 items-center shadow-lg shadow-black/5 max-w-md w-full">
-            <Text className="text-5xl mb-3">📍</Text>
-            <Text className="text-lg font-quicksand-bold text-dark-100 text-center mb-1">
-              Delivery Location Selected
-            </Text>
-            <Text className="text-xs font-quicksand-medium text-gray-500 text-center mb-4 leading-relaxed">
-              {selectedAddress}
-            </Text>
-
-            <TouchableOpacity
-              onPress={fetchGPSLocation}
-              disabled={isLocatingUser}
-              className="bg-primary/10 border border-primary/30 px-5 py-2.5 rounded-full flex-row items-center active:opacity-80 mb-2"
-            >
-              {isLocatingUser ? (
-                <ActivityIndicator size="small" color="#53B175" className="mr-2" />
-              ) : (
-                <Text className="text-base mr-2">🎯</Text>
-              )}
-              <Text className="text-primary font-quicksand-bold text-xs">
-                Auto-Detect Current GPS Location
-              </Text>
-            </TouchableOpacity>
+        {/* Google Map Interactive Frame */}
+        <View className="flex-1 w-full bg-gray-100 relative p-4 max-w-3xl mx-auto">
+          <View className="flex-1 w-full rounded-3xl overflow-hidden border-2 border-primary/20 shadow-md shadow-black/10">
+            <iframe
+              title="Google Map"
+              src={mapEmbedUrl}
+              width="100%"
+              height="100%"
+              style={{ border: 0, minHeight: 300, width: '100%', height: '100%' }}
+              loading="lazy"
+              allowFullScreen
+            />
           </View>
+
+          {/* GPS Auto-Detect Floating Button */}
+          <TouchableOpacity
+            onPress={fetchGPSLocation}
+            disabled={isLocatingUser}
+            className="absolute bottom-8 right-8 bg-white border-2 border-primary/30 px-4 py-2.5 rounded-full flex-row items-center shadow-lg shadow-black/15 active:scale-95"
+          >
+            {isLocatingUser ? (
+              <ActivityIndicator size="small" color="#53B175" className="mr-2" />
+            ) : (
+              <Text className="text-base mr-2">🎯</Text>
+            )}
+            <Text className="text-primary font-quicksand-bold text-xs">
+              Detect GPS
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Selected Address Preview & Confirm Bar */}
-        <View className="p-5 bg-white border-t-2 border-primary/10 shadow-2xl">
+        <View className="p-5 bg-white border-t-2 border-primary/10 shadow-2xl max-w-2xl w-full mx-auto">
           <View className="flex-row items-start mb-3">
             <View className="w-9 h-9 rounded-full bg-primary/10 items-center justify-center mr-3 mt-0.5 border border-primary/20">
               <Text className="text-base">📍</Text>
             </View>
             <View className="flex-1">
               <Text className="text-xs font-quicksand-semibold text-gray-400 uppercase tracking-wider">
-                Selected Address
+                Delivery Address Selected
               </Text>
-              {isGeocoding ? (
-                <View className="flex-row items-center mt-1">
-                  <ActivityIndicator size="small" color="#53B175" className="mr-2" />
-                  <Text className="text-gray-400 font-quicksand-medium text-sm">
-                    Fetching address details...
-                  </Text>
-                </View>
-              ) : (
-                <Text
-                  className="text-sm font-quicksand-bold text-dark-100 mt-0.5"
-                  numberOfLines={2}
-                >
-                  {selectedAddress}
-                </Text>
-              )}
+              <Text
+                className="text-sm font-quicksand-bold text-dark-100 mt-0.5"
+                numberOfLines={2}
+              >
+                {selectedAddress}
+              </Text>
             </View>
           </View>
 
@@ -322,9 +308,10 @@ export default function LocationPickerModal({
           <TouchableOpacity
             onPress={handleConfirm}
             className="bg-primary py-3.5 rounded-full items-center justify-center shadow-lg shadow-primary/30 active:opacity-90"
+            style={{ backgroundColor: '#53B175' }}
           >
             <Text className="text-white font-quicksand-bold text-base">
-              Use Current Location
+              Confirm Delivery Location
             </Text>
           </TouchableOpacity>
         </View>
