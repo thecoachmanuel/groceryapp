@@ -206,60 +206,82 @@ function RootLayout() {
   }
 
   return (
-    <View className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: '#ffffff' },
+    <View
+      className="flex-1"
+      style={{
+        backgroundColor: Platform.OS === 'web' ? '#f8fafc' : '#ffffff',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <View
+        className="flex-1 bg-white w-full"
+        style={{
+          backgroundColor: '#ffffff',
+          maxWidth: Platform.OS === 'web' ? 480 : undefined,
+          width: '100%',
+          minHeight: Platform.OS === 'web' ? '100vh' as any : undefined,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: Platform.OS === 'web' ? 0.08 : 0,
+          shadowRadius: 30,
+          elevation: Platform.OS === 'web' ? 5 : 0,
         }}
-      />
-
-      {/* Floating Realtime Notification Toast */}
-      {notification && (
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => {
-            const targetOrderId = notification.orderId
-            setNotification(null)
-            if (targetOrderId) {
-              if (role === 'admin') {
-                router.push('/admin/orders' as any)
-              } else if (role === 'seller') {
-                router.push('/seller/orders' as any)
-              } else {
-                router.push(`/order/${targetOrderId}` as any)
-              }
-            } else {
-              if (role === 'admin') {
-                router.push('/admin/orders' as any)
-              } else if (role === 'seller') {
-                router.push('/seller/orders' as any)
-              } else {
-                router.push('/orders' as any)
-              }
-            }
+      >
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: '#ffffff' },
           }}
-          className="absolute top-12 left-5 right-5 bg-white rounded-2xl p-4 shadow-2xl z-50 border-2 border-primary/20 flex-row items-center"
-        >
-          <View className="w-10 h-10 rounded-xl bg-primary/10 items-center justify-center mr-3 border border-primary/20">
-            <Text className="text-xl">{notification.icon || '🔔'}</Text>
-          </View>
-          <View className="flex-1">
-            <Text className="text-dark-100 font-quicksand-bold text-sm">
-              {notification.title}
-            </Text>
-            <Text className="text-gray-500 font-quicksand-medium text-xs">
-              {notification.body}
-            </Text>
-            <Text className="text-primary font-quicksand-bold text-[11px] mt-1">
-              Tap to view order details →
-            </Text>
-          </View>
-          <TouchableOpacity onPress={() => setNotification(null)} className="p-1">
-            <Text className="text-gray-400 font-bold ml-2">✕</Text>
+        />
+
+        {/* Floating Realtime Notification Toast */}
+        {notification && (
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => {
+              const targetOrderId = notification.orderId
+              setNotification(null)
+              if (targetOrderId) {
+                if (role === 'admin') {
+                  router.push('/admin/orders' as any)
+                } else if (role === 'seller') {
+                  router.push('/seller/orders' as any)
+                } else {
+                  router.push(`/order/${targetOrderId}` as any)
+                }
+              } else {
+                if (role === 'admin') {
+                  router.push('/admin/orders' as any)
+                } else if (role === 'seller') {
+                  router.push('/seller/orders' as any)
+                } else {
+                  router.push('/orders' as any)
+                }
+              }
+            }}
+            className="absolute top-12 left-5 right-5 bg-white rounded-2xl p-4 shadow-2xl z-50 border-2 border-primary/20 flex-row items-center"
+          >
+            <View className="w-10 h-10 rounded-xl bg-primary/10 items-center justify-center mr-3 border border-primary/20">
+              <Text className="text-xl">{notification.icon || '🔔'}</Text>
+            </View>
+            <View className="flex-1">
+              <Text className="text-dark-100 font-quicksand-bold text-sm">
+                {notification.title}
+              </Text>
+              <Text className="text-gray-500 font-quicksand-medium text-xs">
+                {notification.body}
+              </Text>
+              <Text className="text-primary font-quicksand-bold text-[11px] mt-1">
+                Tap to view order details →
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => setNotification(null)} className="p-1">
+              <Text className="text-gray-400 font-bold ml-2">✕</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
-        </TouchableOpacity>
-      )}
+        )}
+      </View>
     </View>
   );
 }

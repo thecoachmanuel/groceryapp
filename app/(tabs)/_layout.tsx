@@ -77,7 +77,12 @@ export default function TabLayout() {
         sceneStyle: { backgroundColor: '#ffffff' },
         tabBarStyle: {
           borderRadius: 35,
-          marginHorizontal: 15,
+          marginHorizontal: Platform.OS === 'web' ? 'auto' : 15,
+          maxWidth: Platform.OS === 'web' ? 450 : undefined,
+          width: Platform.OS === 'web' ? '92%' : undefined,
+          alignSelf: 'center',
+          left: Platform.OS === 'web' ? 0 : undefined,
+          right: Platform.OS === 'web' ? 0 : undefined,
           height: 70,
           position: 'absolute',
           bottom: tabBottomOffset,

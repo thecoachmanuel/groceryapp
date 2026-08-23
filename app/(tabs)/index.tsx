@@ -27,7 +27,8 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
-const CAROUSEL_CARD_WIDTH = SCREEN_WIDTH - 40 // Padding 20 on each side
+const EFFECTIVE_WIDTH = Platform.OS === 'web' ? Math.min(SCREEN_WIDTH, 480) : SCREEN_WIDTH
+const CAROUSEL_CARD_WIDTH = EFFECTIVE_WIDTH - 40 // Padding 20 on each side
 
 // Categories fallback with emoji icons for horizontal scroll
 const HOME_CATEGORIES = [
