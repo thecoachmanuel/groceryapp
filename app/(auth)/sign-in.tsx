@@ -3,7 +3,7 @@ import CustomInput from '@/components/CustomInput'
 import { signIn, account } from '@/lib/appwrite'
 import { Link, router } from 'expo-router'
 import { useState, useEffect } from 'react'
-import { Alert, Text, View } from 'react-native'
+import { Alert, Platform, Text, View } from 'react-native'
 import * as Sentry from '@sentry/react-native'
 import useAuthStore from '@/store/auth.store'
 import useOnboardingStore from '@/store/onboarding.store'
@@ -28,7 +28,7 @@ const SignIn = () => {
           router.replace('/(tabs)')
         }
       } catch {
-        if (!hasCompletedOnboarding) {
+        if (Platform.OS !== 'web' && !hasCompletedOnboarding) {
           router.replace('/onboarding' as any)
         }
       }

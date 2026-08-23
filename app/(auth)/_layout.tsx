@@ -3,6 +3,7 @@ import useAuthStore from '@/store/auth.store'
 import useBrandingStore from '@/store/branding.store'
 import { Redirect, Slot } from 'expo-router'
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   ImageBackground,
@@ -17,9 +18,15 @@ export default function AuthLayout() {
   const { isAuthenticated, isLoading } = useAuthStore()
   const { appLogo } = useBrandingStore()
 
-  if (isLoading) return null
+  if (isLoading && Platform.OS !== 'web') {
+    return (
+      <View className="flex-1 bg-white items-center justify-center p-6">
+        <ActivityIndicator size="small" color="#53B175" />
+      </View>
+    )
+  }
 
-  if (isAuthenticated) return <Redirect href="/" />
+  if (isAuthenticated) return <Redirect href="/(tabs)" />
 
   return (
     <KeyboardAvoidingView
