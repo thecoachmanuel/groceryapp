@@ -61,8 +61,6 @@ export default function TabLayout() {
   const { isAuthenticated, user, role, sellerStore } = useAuthStore()
   const { getUnreadCount } = useNotificationStore()
 
-  if (!isAuthenticated) return <Redirect href="/sign-in" />
-
   const currentUserId = user?.$id || (user as any)?.accountId
   const sellerStoreId = sellerStore?.$id || (user as any)?.storeId
   const unreadNotifCount = getUnreadCount(role, currentUserId, sellerStoreId)
