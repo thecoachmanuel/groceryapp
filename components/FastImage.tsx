@@ -1,14 +1,15 @@
 import React, { useState } from 'react'
-import { Image, ImageProps } from 'expo-image'
-import { ActivityIndicator, View } from 'react-native'
+import { Image as RNImage, Platform, View } from 'react-native'
+import { Image as ExpoImage, ImageProps as ExpoImageProps } from 'expo-image'
 import { images } from '@/constants'
 
-interface FastImageProps extends Omit<ImageProps, 'source'> {
-  source: string | number | { uri: string }
+interface FastImageProps {
+  source: any
   className?: string
   style?: any
   contentFit?: 'cover' | 'contain' | 'fill' | 'none' | 'scale-down'
   placeholder?: string
+  [key: string]: any
 }
 
 export default function FastImage({
@@ -19,53 +20,62 @@ export default function FastImage({
   placeholder,
   ...props
 }: FastImageProps) {
-  const [isLoading, setIsLoading] = useState(false)
   const [hasError, setHasError] = useState(false)
 
   React.useEffect(() => {
     setHasError(false)
   }, [source])
 
-  // Resolve source object/uri
   let resolvedSource: any = images.logo
 
   if (typeof source === 'number') {
     resolvedSource = source
   } else if (typeof source === 'string' && source.trim() !== '') {
-    resolvedSource = { uri: source }
+    resolvedSource = { uri: source.trim() }
   } else if (typeof source === 'object' && source && 'uri' in source && source.uri) {
     resolvedSource = source
   }
 
   if (hasError || !source) {
     return (
-      <View className={`relative overflow-hidden bg-emerald-50 items-center justify-center ${className}`} style={style}>
-        <ActivityIndicator size="small" color="#53B175" />
+      <View
+        className={`relative overflow-hidden bg-emerald-50/50 items-center justify-center ${className}`}
+        style={[{ width: '100%', height: '100%' }, style]}
+      >
+        <RNImage
+          source={images.logo}
+          style={{ width: '60%', height: '60%', opacity: 0.8 }}
+          resizeMode="contain"
+        />
+      </View>
+    )
+  }
+
+  if (Platform.OS === 'web') {
+    return (
+      <View className={`relative overflow-hidden ${className}`} style={[{ width: '100%', height: '100%' }, style]}>
+        <RNImage
+          source={resolvedSource}
+          style={[{ width: '100%', height: '100%' }, style]}
+          resizeMode={contentFit === 'contain' ? 'contain' : 'cover'}
+          onError={() => setHasError(true)}
+          {...props}
+        />
       </View>
     )
   }
 
   return (
-    <View className={`relative overflow-hidden ${className}`} style={style}>
-      <Image
+    <View className={`relative overflow-hidden ${className}`} style={[{ width: '100%', height: '100%' }, style]}>
+      <ExpoImage
         source={resolvedSource}
         style={[{ width: '100%', height: '100%' }, style]}
         contentFit={contentFit}
         cachePolicy="memory-disk"
         transition={200}
-        onLoadStart={() => setIsLoading(true)}
-        onLoadEnd={() => setIsLoading(false)}
-        onError={() => {
-          setIsLoading(false)
-          setHasError(true)
-        }}
+        onError={() => setHasError(true)}
         {...props}
       />
-      {isLoading && (
-        <View className="absolute inset-0 items-center justify-center bg-gray-100/50">
-          <ActivityIndicator size="small" color="#53B175" />
-        </View>
-      )}
     </View>
   )
 }

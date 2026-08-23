@@ -212,11 +212,11 @@ export default function Index() {
     if (banner.targetType === 'product' && banner.targetId) {
       router.push(`/product/${banner.targetId}` as any)
     } else if (banner.targetType === 'category' && banner.targetId) {
-      router.push({ pathname: '/(tabs)/search', params: { category: banner.targetId } } as any)
+      router.push({ pathname: '/search', params: { category: banner.targetId } } as any)
     } else if (banner.targetCategory) {
-      router.push({ pathname: '/(tabs)/search', params: { category: banner.targetCategory } } as any)
+      router.push({ pathname: '/search', params: { category: banner.targetCategory } } as any)
     } else {
-      router.push('/(tabs)/search' as any)
+      router.push('/search' as any)
     }
   }
 
@@ -426,7 +426,7 @@ export default function Index() {
               <View className="mb-6 px-5">
                 <View className="flex-between flex-row items-center mb-3">
                   <Text className="text-lg font-quicksand-bold text-dark-100">Explore Categories</Text>
-                  <TouchableOpacity onPress={() => router.push('/(tabs)/search')}>
+                  <TouchableOpacity onPress={() => router.push('/search' as any)}>
                     <Text className="text-xs font-quicksand-bold text-primary" style={{ color: '#53B175' }}>See All →</Text>
                   </TouchableOpacity>
                 </View>
@@ -438,7 +438,7 @@ export default function Index() {
                       activeOpacity={0.85}
                       onPress={() =>
                         router.push({
-                          pathname: '/(tabs)/search',
+                          pathname: '/search',
                           params: cat.name === 'All' ? {} : { category: cat.name },
                         } as any)
                       }
@@ -573,7 +573,7 @@ export default function Index() {
                       Products sorted by nearest store availability
                     </Text>
                   </View>
-                  <TouchableOpacity onPress={() => router.push('/(tabs)/search')}>
+                  <TouchableOpacity onPress={() => router.push('/search' as any)}>
                     <Text className="text-xs font-quicksand-bold text-primary" style={{ color: '#53B175' }}>View All →</Text>
                   </TouchableOpacity>
                 </View>
