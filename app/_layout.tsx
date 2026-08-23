@@ -168,7 +168,9 @@ export default Sentry.wrap(function RootLayout() {
     }
   }, [user, role, isSeller, isAdmin, sellerStore])
 
-  if (!fontsLoaded || isLoading) {
+  const showSplash = Platform.OS !== 'web' && (!fontsLoaded || isLoading);
+
+  if (showSplash) {
     return (
       <View className="flex-1 bg-white items-center justify-center p-6">
         {appLogo ? (
