@@ -134,9 +134,7 @@ const SEED_PRODUCTS = [
     stock: 65,
     categoryName: 'Snacks & Sweets',
     categorySlug: 'snacks-sweets',
-    image_url: 'https://images.unsplash.com/photo-1509358271058-acd05cc93228?w=800&auto=format&fit=crop&q=80',
-    calories: 157,
-    protein: 5,
+    image_url: 'https://images.unsplash.com/photo-1536591375315-1b836815d230?w=800&auto=format&fit=crop&q=80',
   },
   {
     name: 'Cold Pressed Extra Virgin Olive Oil (750ml)',
@@ -234,8 +232,6 @@ async function main() {
       categories: p.categoryName,
       categoryId: catId,
       isActive: true,
-      calories: p.calories,
-      protein: p.protein,
     };
 
     const createProdUrl = `${ENDPOINT}/databases/${DATABASE_ID}/collections/${MENU_COLLECTION_ID}/documents`;

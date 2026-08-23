@@ -57,15 +57,29 @@ const SignIn = () => {
 
         try {
           await signIn({ email: adminEmail, password: adminPassword })
-        } catch {
-          // Auto create Admin user in Appwrite if first time logging in as Admin
-          const { createUser } = await import('@/lib/appwrite')
-          await createUser({
-            email: adminEmail,
-            password: adminPassword,
-            name: 'App Owner (Admin)',
-            role: 'admin',
-          })
+        } catch (signInErr: any) {
+          const errStr = String(signInErr?.message || signInErr).toLowerCase()
+          if (errStr.includes('invalid credentials') || errStr.includes('user_not_found') || errStr.includes('not found')) {
+            // Auto create Admin user in Appwrite if first time logging in as Admin
+            try {
+              const { createUser } = await import('@/lib/appwrite')
+              await createUser({
+                email: adminEmail,
+                password: adminPassword,
+                name: 'App Owner (Admin)',
+                role: 'admin',
+              })
+            } catch (createErr: any) {
+              const createErrStr = String(createErr?.message || createErr).toLowerCase()
+              if (!createErrStr.includes('already exists')) {
+                throw createErr
+              }
+              // If user already exists, try signing in once more after session clear
+              await signIn({ email: adminEmail, password: adminPassword })
+            }
+          } else {
+            throw signInErr
+          }
         }
 
         await fetchAuthenticatedUser()

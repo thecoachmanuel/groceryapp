@@ -90,8 +90,8 @@ export default function SavedAddressesScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
-      <StatusBar barStyle="dark-content" backgroundColor="#E6F7EC" />
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Header Bar - Route header with left-to-right slide back animation */}
       <View className="px-5 pt-4 pb-3 flex-row items-center justify-between">
@@ -269,7 +269,7 @@ export default function SavedAddressesScreen() {
               <Text className="text-xs font-quicksand-bold text-dark-100">
                 🗺️ Pinpoint on Map (Select Location)
               </Text>
-              <Text className="text-primary font-bold text-xs">→</Text>
+              <Text className="text-primary font-bold text-xs" style={{ color: '#53B175' }}>→</Text>
             </TouchableOpacity>
 
             <View className="flex-row gap-3">
@@ -283,6 +283,7 @@ export default function SavedAddressesScreen() {
               <TouchableOpacity
                 onPress={handleSaveNewAddress}
                 className="flex-1 bg-primary py-3 rounded-full items-center"
+                style={{ backgroundColor: '#53B175' }}
               >
                 <Text className="text-white font-quicksand-bold text-xs">Save Address</Text>
               </TouchableOpacity>

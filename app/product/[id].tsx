@@ -11,8 +11,9 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Platform,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 const SAMPLE_CUSTOMIZATIONS = [
   { id: 'c1', name: 'Extra Cheese', price: 40, type: 'topping' },
@@ -22,6 +23,11 @@ const SAMPLE_CUSTOMIZATIONS = [
 ]
 
 export default function ProductDetail() {
+  const insets = useSafeAreaInsets()
+  const safeBottom = Platform.OS === 'ios'
+    ? Math.max(insets.bottom || 0, 12)
+    : (insets.bottom > 0 ? insets.bottom : 0)
+
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const addItem = useCartStore((s) => s.addItem)
@@ -66,15 +72,15 @@ export default function ProductDetail() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-bg-light justify-center items-center">
-        <ActivityIndicator size="large" color="#16A34A" />
+      <SafeAreaView className="flex-1 bg-white justify-center items-center" style={{ backgroundColor: '#ffffff' }}>
+        <ActivityIndicator size="large" color="#53B175" />
       </SafeAreaView>
     )
   }
 
   if (!item) {
     return (
-      <SafeAreaView className="flex-1 bg-bg-light justify-center items-center px-6">
+      <SafeAreaView className="flex-1 bg-white justify-center items-center px-6" style={{ backgroundColor: '#ffffff' }}>
         <Text className="text-xl font-quicksand-bold text-dark-100 mb-4">
           Product Not Found
         </Text>
@@ -96,8 +102,10 @@ export default function ProductDetail() {
 
   const weightVariantsList: any[] = item.weightVariants ? JSON.parse(item.weightVariants) : []
   const baseUnitPrice = selectedWeightVariant ? selectedWeightVariant.price : item.price
-  const extraCost = selectedCustomizations.reduce((acc, c) => acc + c.price, 0)
-  const totalPrice = (baseUnitPrice + extraCost) * quantity
+  const isItemOnSale = !selectedWeightVariant && item.discountPrice && item.discountPrice < item.price
+  const effectiveUnitPrice = isItemOnSale ? item.discountPrice : baseUnitPrice
+  const extraCost = selectedCustomizations.reduce((acc: number, c: any) => acc + c.price, 0)
+  const totalPrice = (effectiveUnitPrice + extraCost) * quantity
 
   const handleAddToCart = () => {
     const displayName = selectedWeightVariant
@@ -107,21 +115,21 @@ export default function ProductDetail() {
     addItem({
       id: selectedWeightVariant ? `${item.$id}_${selectedWeightVariant.weight}` : item.$id,
       name: displayName,
-      price: baseUnitPrice,
+      price: effectiveUnitPrice,
       image_url: imageUrl,
       customizations: selectedCustomizations,
+      sellerId: item.sellerId || (item as any).seller_id || (item as any).storeId,
     })
     router.push('/(tabs)/cart')
   }
 
   const extrasList: any[] = item.extras ? JSON.parse(item.extras) : []
-  const hasNutrition = (item.calories && item.calories > 0) || (item.protein && item.protein > 0)
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: 110 }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 120 + safeBottom }}
       >
         {/* Header */}
         <View className="flex-row justify-between items-center px-5 pt-3">
@@ -142,12 +150,12 @@ export default function ProductDetail() {
         </View>
 
         {/* Product Image Banner */}
-        <View className="items-center my-6">
-          <View className="w-72 h-72 bg-white rounded-[40px] p-6 shadow-xl shadow-black/10 items-center justify-center border border-primary/10">
+        <View className="items-center my-6 px-5">
+          <View className="w-full h-72 bg-white rounded-[36px] shadow-xl shadow-black/10 items-center justify-center border border-primary/10 overflow-hidden">
             <FastImage
               source={imageUrl}
               className="w-full h-full"
-              contentFit="contain"
+              contentFit="cover"
             />
           </View>
         </View>
@@ -168,9 +176,22 @@ export default function ProductDetail() {
                 </Text>
               </View>
             </View>
-            <Text className="text-3xl font-quicksand-bold text-primary">
-              ₦ {baseUnitPrice.toLocaleString()}
-            </Text>
+            <View className="items-end">
+              {isItemOnSale ? (
+                <>
+                  <Text className="text-3xl font-quicksand-bold text-primary" style={{ color: '#53B175' }}>
+                    ₦ {Number(effectiveUnitPrice).toLocaleString()}
+                  </Text>
+                  <Text className="text-sm font-quicksand-medium text-gray-400 line-through">
+                    ₦ {Number(item.price).toLocaleString()}
+                  </Text>
+                </>
+              ) : (
+                <Text className="text-3xl font-quicksand-bold text-primary" style={{ color: '#53B175' }}>
+                  ₦ {Number(baseUnitPrice).toLocaleString()}
+                </Text>
+              )}
+            </View>
           </View>
 
           {/* Selectable Weight & Package Variants */}
@@ -188,11 +209,12 @@ export default function ProductDetail() {
                       onPress={() => setSelectedWeightVariant(wv)}
                       className={`px-4 py-3 rounded-2xl mr-3 border-2 items-center ${isSelected ? 'bg-primary border-primary' : 'bg-gray-50 border-gray-200'
                         }`}
+                      style={isSelected ? { backgroundColor: '#53B175', borderColor: '#53B175' } : {}}
                     >
                       <Text className={`font-quicksand-bold text-xs ${isSelected ? 'text-white' : 'text-gray-800'}`}>
                         {wv.weight}
                       </Text>
-                      <Text className={`font-quicksand-semibold text-[11px] mt-0.5 ${isSelected ? 'text-white/90' : 'text-primary'}`}>
+                      <Text className={`font-quicksand-semibold text-[11px] mt-0.5 ${isSelected ? 'text-white/90' : 'text-primary'}`} style={isSelected ? {} : { color: '#53B175' }}>
                         ₦ {wv.price.toLocaleString()}
                       </Text>
                     </TouchableOpacity>
@@ -202,38 +224,7 @@ export default function ProductDetail() {
             </View>
           )}
 
-          {/* Conditional Calorie & Protein Badges */}
-          {hasNutrition && (
-            <View className="flex-row gap-4 my-6">
-              {item.calories && item.calories > 0 ? (
-                <View className="flex-1 bg-primary/10 rounded-2xl p-3 flex-row items-center border border-primary/20">
-                  <Text className="text-2xl mr-2">🔥</Text>
-                  <View>
-                    <Text className="text-xs text-gray-500 font-quicksand-semibold">
-                      Calories
-                    </Text>
-                    <Text className="text-base font-quicksand-bold text-dark-100">
-                      {item.calories} kcal
-                    </Text>
-                  </View>
-                </View>
-              ) : null}
 
-              {item.protein && item.protein > 0 ? (
-                <View className="flex-1 bg-primary/10 rounded-2xl p-3 flex-row items-center border border-primary/20">
-                  <Text className="text-2xl mr-2">🥩</Text>
-                  <View>
-                    <Text className="text-xs text-gray-500 font-quicksand-semibold">
-                      Protein
-                    </Text>
-                    <Text className="text-base font-quicksand-bold text-dark-100">
-                      {item.protein} g
-                    </Text>
-                  </View>
-                </View>
-              ) : null}
-            </View>
-          )}
 
           {/* Description */}
           <Text className="text-dark-100 font-quicksand-bold text-lg mb-2">
@@ -270,6 +261,7 @@ export default function ProductDetail() {
                           ? 'bg-primary border-primary'
                           : 'border-gray-400 bg-white'
                           }`}
+                        style={isSelected ? { backgroundColor: '#53B175', borderColor: '#53B175' } : {}}
                       >
                         {isSelected && (
                           <Text className="text-white text-xs font-bold">✓</Text>
@@ -279,7 +271,7 @@ export default function ProductDetail() {
                         {cus.name}
                       </Text>
                     </View>
-                    <Text className="text-primary font-quicksand-bold">
+                    <Text className="text-primary font-quicksand-bold" style={{ color: '#53B175' }}>
                       + ₦ {cus.price}
                     </Text>
                   </TouchableOpacity>
@@ -290,12 +282,16 @@ export default function ProductDetail() {
         </View>
       </ScrollView>
 
-      {/* Sticky Bottom Action Bar */}
-      <View className="absolute bottom-0 left-0 right-0 bg-white px-6 py-4 border-t border-primary/10 shadow-2xl">
+      {/* Sticky Bottom Action Bar with Dynamic Android Safe Area Padding */}
+      <View
+        style={{ paddingBottom: 12 + safeBottom }}
+        className="absolute bottom-0 left-0 right-0 bg-white px-6 pt-4 border-t border-primary/10 shadow-2xl z-50"
+      >
         <TouchableOpacity
           onPress={handleAddToCart}
           activeOpacity={0.88}
           className="w-full bg-primary rounded-full py-4 items-center justify-center shadow-lg shadow-primary/30"
+          style={{ backgroundColor: '#53B175' }}
         >
           <Text className="text-white font-quicksand-bold text-base">
             Add to Cart • ₦ {totalPrice.toLocaleString()}

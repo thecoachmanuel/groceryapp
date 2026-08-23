@@ -26,7 +26,8 @@ export default function AuthLayout() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
-        className="bg-bg-light h-full"
+        className="bg-white h-full"
+        style={{ backgroundColor: '#ffffff' }}
         keyboardShouldPersistTaps="handled"
       >
         <View

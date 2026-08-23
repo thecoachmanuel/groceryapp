@@ -1,3 +1,6 @@
+import { images } from '@/constants'
+import { usePagesStore } from '@/store/pages.store'
+import { useRouter } from 'expo-router'
 import React from 'react'
 import {
   Image,
@@ -8,9 +11,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import { useRouter } from 'expo-router'
-import { images } from '@/constants'
-import { usePagesStore } from '@/store/pages.store'
 
 import useBrandingStore from '@/store/branding.store'
 
@@ -20,8 +20,8 @@ export default function AboutScreen() {
   const { appName, appLogo, appTagline } = useBrandingStore()
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
-      <StatusBar barStyle="dark-content" backgroundColor="#E6F7EC" />
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Header Bar - Clean header without white rectangle background */}
       <View className="px-5 pt-4 pb-3 flex-row items-center justify-between">

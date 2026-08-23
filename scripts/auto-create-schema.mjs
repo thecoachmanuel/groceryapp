@@ -177,8 +177,6 @@ async function autoCreateSchema() {
   await createStringAttr('products', 'categoryId', 255, false);
   await createBooleanAttr('products', 'isActive', false);
   await createStringAttr('products', 'extras', 10000, false);
-  await createIntegerAttr('products', 'calories', false);
-  await createIntegerAttr('products', 'protein', false);
 
   // 6. User Table additions
   await createStringAttr('user', 'role', 50, false);

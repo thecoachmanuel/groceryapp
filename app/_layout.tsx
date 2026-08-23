@@ -21,6 +21,8 @@ import { images } from "@/constants";
 import useBrandingStore from "@/store/branding.store";
 
 import useNotificationStore from "@/store/notification.store";
+import { registerForPushNotificationsAsync, sendLocalNotification } from "@/lib/notifications";
+import * as Updates from 'expo-updates';
 
 export default Sentry.wrap(function RootLayout() {
   const router = useRouter();
@@ -30,6 +32,11 @@ export default Sentry.wrap(function RootLayout() {
   const [notification, setNotification] = useState<{ title: string; body: string; icon?: string; orderId?: string } | null>(null);
 
   const [fontsLoaded, error] = useFonts({
+    "Quicksand-Bold": require('../assets/fonts/Quicksand-Bold.ttf'),
+    "Quicksand-Medium": require('../assets/fonts/Quicksand-Medium.ttf'),
+    "Quicksand-Regular": require('../assets/fonts/Quicksand-Regular.ttf'),
+    "Quicksand-SemiBold": require('../assets/fonts/Quicksand-SemiBold.ttf'),
+    "Quicksand-Light": require('../assets/fonts/Quicksand-Light.ttf'),
     "QuickSand-Bold": require('../assets/fonts/Quicksand-Bold.ttf'),
     "QuickSand-Medium": require('../assets/fonts/Quicksand-Medium.ttf'),
     "QuickSand-Regular": require('../assets/fonts/Quicksand-Regular.ttf'),
@@ -38,8 +45,25 @@ export default Sentry.wrap(function RootLayout() {
   });
 
   useEffect(() => {
-    fetchBranding();
-  }, []);
+    async function checkForOTAUpdates() {
+      if (__DEV__) return
+      try {
+        const update = await Updates.checkForUpdateAsync()
+        if (update.isAvailable) {
+          await Updates.fetchUpdateAsync()
+          await Updates.reloadAsync()
+        }
+      } catch (err) {
+        console.log('OTA update check error:', err)
+      }
+    }
+    checkForOTAUpdates()
+  }, [])
+
+  useEffect(() => {
+    registerForPushNotificationsAsync()
+    fetchBranding()
+  }, [])
 
   useEffect(() => {
     if(error) throw error;
@@ -52,13 +76,13 @@ export default Sentry.wrap(function RootLayout() {
 
   useEffect(() => {
     // Realtime Order Notifications for Customer, Seller, and Admin
-    const unsubscribe = subscribeToOrders((response) => {
+    const unsubscribe = subscribeToOrders((response: any) => {
       const order = response?.payload
       const events: string[] = response?.events || []
       if (!order) return
 
       const isNewOrder = events.some((e) => e.endsWith('.create'))
-      const orderIdShort = (order.$id || '').slice(-6)
+      const orderIdShort = (order.$id || '').slice(-6).toUpperCase()
       const currentUserId = user?.$id || (user as any)?.accountId
       const sellerStoreId = sellerStore?.$id || (user as any)?.storeId
 
@@ -78,6 +102,9 @@ export default Sentry.wrap(function RootLayout() {
           orderId: order.$id,
         })
 
+        // Fire native system notification (shows on phone status bar/lockscreen when app is minimized!)
+        sendLocalNotification(notifTitle, notifBody, { orderId: order.$id })
+
         setNotification({ title: notifTitle, body: notifBody, icon: '🏪', orderId: order.$id })
         setTimeout(() => setNotification(null), 6000)
         return
@@ -95,6 +122,9 @@ export default Sentry.wrap(function RootLayout() {
           targetRole: 'admin',
           orderId: order.$id,
         })
+
+        // Fire native system notification
+        sendLocalNotification(notifTitle, notifBody, { orderId: order.$id })
 
         setNotification({ title: notifTitle, body: notifBody, icon: '👑', orderId: order.$id })
         setTimeout(() => setNotification(null), 6000)
@@ -116,6 +146,9 @@ export default Sentry.wrap(function RootLayout() {
           targetUserId: currentUserId,
           orderId: order.$id,
         })
+
+        // Fire native system notification
+        sendLocalNotification(notifTitle, notifBody, { orderId: order.$id })
 
         setNotification({ title: notifTitle, body: notifBody, icon: '🥬', orderId: order.$id })
         setTimeout(() => setNotification(null), 6000)
@@ -150,14 +183,19 @@ export default Sentry.wrap(function RootLayout() {
         <Text className="text-black text-2xl font-bold mt-4 tracking-wide font-quicksand-bold">
           {appName}
         </Text>
-        <ActivityIndicator size="small" color="#16A34A" className="mt-6" />
+        <ActivityIndicator size="small" color="#53B175" className="mt-6" />
       </View>
     );
   }
 
   return (
-    <View className="flex-1">
-      <Stack screenOptions={{ headerShown: false }} />
+    <View className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: '#ffffff' },
+        }}
+      />
 
       {/* Floating Realtime Notification Toast */}
       {notification && (
@@ -184,16 +222,16 @@ export default Sentry.wrap(function RootLayout() {
               }
             }
           }}
-          className="absolute top-12 left-5 right-5 bg-dark-100 rounded-2xl p-4 shadow-2xl z-50 border border-primary/30 flex-row items-center"
+          className="absolute top-12 left-5 right-5 bg-white rounded-2xl p-4 shadow-2xl z-50 border-2 border-primary/20 flex-row items-center"
         >
-          <View className="w-10 h-10 rounded-xl bg-primary/20 items-center justify-center mr-3">
+          <View className="w-10 h-10 rounded-xl bg-primary/10 items-center justify-center mr-3 border border-primary/20">
             <Text className="text-xl">{notification.icon || '🔔'}</Text>
           </View>
           <View className="flex-1">
-            <Text className="text-white font-quicksand-bold text-sm">
+            <Text className="text-dark-100 font-quicksand-bold text-sm">
               {notification.title}
             </Text>
-            <Text className="text-gray-300 font-quicksand-medium text-xs">
+            <Text className="text-gray-500 font-quicksand-medium text-xs">
               {notification.body}
             </Text>
             <Text className="text-primary font-quicksand-bold text-[11px] mt-1">

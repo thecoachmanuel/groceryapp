@@ -1,4 +1,19 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import FastImage from '@/components/FastImage'
+import { images } from '@/constants'
+import {
+  appwriteConfig,
+  createProduct,
+  deleteProduct,
+  deleteStorageFileByUrl,
+  getCategories,
+  getMenu,
+  getStores,
+  updateProduct,
+  uploadImageToStorage,
+} from '@/lib/appwrite'
+import * as ImagePicker from 'expo-image-picker'
+import { useRouter } from 'expo-router'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -15,20 +30,6 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
-import * as ImagePicker from 'expo-image-picker'
-import {
-  appwriteConfig,
-  getMenu,
-  getStores,
-  getCategories,
-  createProduct,
-  updateProduct,
-  deleteProduct,
-  uploadImageToStorage,
-} from '@/lib/appwrite'
-import { images } from '@/constants'
-import FastImage from '@/components/FastImage'
 
 // Intelligent taxonomy mapping for auto-assigning product categories
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
@@ -96,9 +97,8 @@ export default function AdminProducts() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState('')
+  const [discountPrice, setDiscountPrice] = useState('')
   const [stock, setStock] = useState('50')
-  const [calories, setCalories] = useState('')
-  const [protein, setProtein] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedSeller, setSelectedSeller] = useState('')
   const [imageUri, setImageUri] = useState<string | null>(null)
@@ -129,7 +129,7 @@ export default function AdminProducts() {
           const assigned = classifyProduct(p.name, p.description, catList)
           needsPersisting = true
           // Background sync to database
-          updateProduct(p.$id, { categories: assigned, categoryId: assigned }).catch(() => {})
+          updateProduct(p.$id, { categories: assigned, categoryId: assigned }).catch(() => { })
           return { ...p, categories: assigned, categoryId: assigned }
         }
         return p
@@ -184,9 +184,8 @@ export default function AdminProducts() {
     setName('')
     setDescription('')
     setPrice('')
+    setDiscountPrice('')
     setStock('50')
-    setCalories('')
-    setProtein('')
     setImageUri(null)
     setExtras([])
     setWeightVariants([])
@@ -209,9 +208,8 @@ export default function AdminProducts() {
     setName(prod.name || '')
     setDescription(prod.description || '')
     setPrice(prod.price ? prod.price.toString() : '')
+    setDiscountPrice(prod.discountPrice ? prod.discountPrice.toString() : '')
     setStock(prod.stock ? prod.stock.toString() : '50')
-    setCalories(prod.calories ? prod.calories.toString() : '')
-    setProtein(prod.protein ? prod.protein.toString() : '')
     setImageUri(prod.image_url || prod.imageUrl || prod.image || null)
     setSelectedCategory(prod.categories || prod.type || (categories[0]?.name || 'Groceries'))
     setSelectedSeller(prod.sellerId || stores[0]?.$id || '')
@@ -370,6 +368,9 @@ export default function AdminProducts() {
       let finalImageUrl = imageUri || 'https://cloud.appwrite.io/v1/storage/buckets/placeholder/files/view'
 
       if (imageUri && !imageUri.startsWith('http')) {
+        if (editingProduct?.image_url || editingProduct?.imageUrl) {
+          await deleteStorageFileByUrl(editingProduct.image_url || editingProduct.imageUrl)
+        }
         finalImageUrl = await uploadImageToStorage(imageUri, 'prod')
       }
 
@@ -379,9 +380,8 @@ export default function AdminProducts() {
         name: name.trim(),
         description: description.trim(),
         price: parseFloat(price) || 0,
+        discountPrice: discountPrice ? parseFloat(discountPrice) : undefined,
         stock: parseInt(stock) || 50,
-        calories: calories ? parseInt(calories) : undefined,
-        protein: protein ? parseInt(protein) : undefined,
         image_url: finalImageUrl,
         imageUrl: finalImageUrl,
         image: finalImageUrl,
@@ -411,7 +411,7 @@ export default function AdminProducts() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <View>
           {/* Top Header */}
@@ -435,6 +435,7 @@ export default function AdminProducts() {
             <TouchableOpacity
               onPress={openCreateModal}
               className="bg-primary px-3.5 py-2 rounded-2xl flex-row items-center shadow-md shadow-primary/30 active:opacity-80 border-2 border-primary"
+              style={{ backgroundColor: '#53B175', borderColor: '#53B175' }}
             >
               <Text className="text-white font-quicksand-bold text-xs">+ Add Item</Text>
             </TouchableOpacity>
@@ -462,16 +463,14 @@ export default function AdminProducts() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-2">
               <TouchableOpacity
                 onPress={() => setSelectedStoreFilter('all')}
-                className={`px-3.5 py-1.5 rounded-2xl mr-2 border-2 ${
-                  selectedStoreFilter === 'all'
+                className={`px-3.5 py-1.5 rounded-2xl mr-2 border-2 ${selectedStoreFilter === 'all'
                     ? 'bg-primary border-primary'
                     : 'bg-gray-50/70 border-primary/10'
-                }`}
+                  }`}
               >
                 <Text
-                  className={`font-quicksand-bold text-xs ${
-                    selectedStoreFilter === 'all' ? 'text-white' : 'text-gray-700'
-                  }`}
+                  className={`font-quicksand-bold text-xs ${selectedStoreFilter === 'all' ? 'text-white' : 'text-gray-700'
+                    }`}
                 >
                   🏪 All Stores
                 </Text>
@@ -481,16 +480,14 @@ export default function AdminProducts() {
                 <TouchableOpacity
                   key={st.$id}
                   onPress={() => setSelectedStoreFilter(st.$id)}
-                  className={`px-3.5 py-1.5 rounded-2xl mr-2 border-2 ${
-                    selectedStoreFilter === st.$id
+                  className={`px-3.5 py-1.5 rounded-2xl mr-2 border-2 ${selectedStoreFilter === st.$id
                       ? 'bg-primary border-primary'
                       : 'bg-gray-50/70 border-primary/10'
-                  }`}
+                    }`}
                 >
                   <Text
-                    className={`font-quicksand-bold text-xs ${
-                      selectedStoreFilter === st.$id ? 'text-white' : 'text-gray-700'
-                    }`}
+                    className={`font-quicksand-bold text-xs ${selectedStoreFilter === st.$id ? 'text-white' : 'text-gray-700'
+                      }`}
                   >
                     {st.storeName}
                   </Text>
@@ -503,16 +500,14 @@ export default function AdminProducts() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <TouchableOpacity
                   onPress={() => setSelectedCategoryFilter('all')}
-                  className={`px-3 py-1 rounded-xl mr-2 border-2 ${
-                    selectedCategoryFilter === 'all'
-                      ? 'bg-dark-100 border-dark-100'
+                  className={`px-3 py-1 rounded-xl mr-2 border-2 ${selectedCategoryFilter === 'all'
+                      ? 'bg-primary border-primary'
                       : 'bg-gray-50/70 border-primary/10'
-                  }`}
+                    }`}
                 >
                   <Text
-                    className={`font-quicksand-bold text-[11px] ${
-                      selectedCategoryFilter === 'all' ? 'text-white' : 'text-gray-600'
-                    }`}
+                    className={`font-quicksand-bold text-[11px] ${selectedCategoryFilter === 'all' ? 'text-white' : 'text-gray-600'
+                      }`}
                   >
                     All Categories
                   </Text>
@@ -524,16 +519,14 @@ export default function AdminProducts() {
                     <TouchableOpacity
                       key={cat.$id || cat.name}
                       onPress={() => setSelectedCategoryFilter(cat.name)}
-                      className={`px-3 py-1 rounded-xl mr-2 border-2 ${
-                        isSelected
+                      className={`px-3 py-1 rounded-xl mr-2 border-2 ${isSelected
                           ? 'bg-primary border-primary'
                           : 'bg-gray-50/70 border-primary/10'
-                      }`}
+                        }`}
                     >
                       <Text
-                        className={`font-quicksand-bold text-[11px] ${
-                          isSelected ? 'text-white' : 'text-gray-700'
-                        }`}
+                        className={`font-quicksand-bold text-[11px] ${isSelected ? 'text-white' : 'text-gray-700'
+                          }`}
                       >
                         🏷️ {cat.name}
                       </Text>
@@ -549,7 +542,7 @@ export default function AdminProducts() {
       {/* Product List */}
       {loading ? (
         <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color="#16A34A" />
+          <ActivityIndicator size="large" color="#53B175" />
         </View>
       ) : (
         <FlatList
@@ -649,16 +642,14 @@ export default function AdminProducts() {
                       </Text>
 
                       <View
-                        className={`px-2.5 py-1 rounded-xl border-2 ${
-                          stockNum > 10
+                        className={`px-2.5 py-1 rounded-xl border-2 ${stockNum > 10
                             ? 'bg-green-500/10 border-green-500/20'
                             : 'bg-amber-500/10 border-amber-500/20'
-                        }`}
+                          }`}
                       >
                         <Text
-                          className={`text-[11px] font-quicksand-bold ${
-                            stockNum > 10 ? 'text-green-700' : 'text-amber-700'
-                          }`}
+                          className={`text-[11px] font-quicksand-bold ${stockNum > 10 ? 'text-green-700' : 'text-amber-700'
+                            }`}
                         >
                           {stockNum > 10 ? `🟢 ${stockNum} in stock` : `🟠 Low: ${stockNum}`}
                         </Text>
@@ -721,11 +712,10 @@ export default function AdminProducts() {
                 <View className="flex-row justify-between items-center">
                   <TouchableOpacity
                     onPress={() => handleToggleProductStatus(item)}
-                    className={`px-3 py-2 rounded-2xl border-2 ${
-                      isActive
+                    className={`px-3 py-2 rounded-2xl border-2 ${isActive
                         ? 'bg-amber-500/10 border-amber-500/20'
                         : 'bg-green-500/10 border-green-500/20'
-                    }`}
+                      }`}
                   >
                     <Text className={`font-quicksand-bold text-xs ${isActive ? 'text-amber-700' : 'text-green-700'}`}>
                       {isActive ? '⏸️ Pause' : '▶️ Activate'}
@@ -964,9 +954,8 @@ export default function AdminProducts() {
                     <TouchableOpacity
                       key={cat.$id || cat.name}
                       onPress={() => setSelectedCategory(cat.name)}
-                      className={`px-3.5 py-2.5 rounded-2xl border-2 mr-2 flex-row items-center ${
-                        isSelected ? 'bg-primary border-primary' : 'bg-gray-50/80 border-primary/15'
-                      }`}
+                      className={`px-3.5 py-2.5 rounded-2xl border-2 mr-2 flex-row items-center ${isSelected ? 'bg-primary border-primary' : 'bg-gray-50/80 border-primary/15'
+                        }`}
                     >
                       <Text className={`font-quicksand-bold text-xs ${isSelected ? 'text-white' : 'text-gray-700'}`}>
                         🏷️ {cat.name}
@@ -990,9 +979,8 @@ export default function AdminProducts() {
                         <TouchableOpacity
                           key={st.$id}
                           onPress={() => setSelectedSeller(st.$id)}
-                          className={`px-3.5 py-2 rounded-2xl border-2 mr-2 ${
-                            isSelected ? 'bg-primary border-primary' : 'bg-gray-50/80 border-primary/15'
-                          }`}
+                          className={`px-3.5 py-2 rounded-2xl border-2 mr-2 ${isSelected ? 'bg-primary border-primary' : 'bg-gray-50/80 border-primary/15'
+                            }`}
                         >
                           <Text className={`font-quicksand-bold text-xs ${isSelected ? 'text-white' : 'text-gray-700'}`}>
                             🏪 {st.storeName}
@@ -1043,7 +1031,18 @@ export default function AdminProducts() {
                   />
                 </View>
                 <View className="flex-1">
-                  <Text className="font-quicksand-bold text-xs text-gray-500 mb-1">Stock Units</Text>
+                  <Text className="font-quicksand-bold text-xs text-red-500 mb-1">Sale Price (₦)</Text>
+                  <TextInput
+                    keyboardType="numeric"
+                    placeholder="e.g. 1200"
+                    placeholderTextColor="#9CA3AF"
+                    value={discountPrice}
+                    onChangeText={setDiscountPrice}
+                    className="w-full bg-gray-50/80 border-2 border-red-500/20 rounded-2xl px-4 py-3 font-quicksand-bold text-red-600 text-sm"
+                  />
+                </View>
+                <View className="flex-1">
+                  <Text className="font-quicksand-bold text-xs text-gray-500 mb-1">Stock</Text>
                   <TextInput
                     keyboardType="numeric"
                     placeholder="50"
@@ -1070,9 +1069,8 @@ export default function AdminProducts() {
                     <TouchableOpacity
                       key={w}
                       onPress={() => setVariantWeight(w)}
-                      className={`px-3 py-1.5 rounded-xl border-2 ${
-                        variantWeight === w ? 'bg-primary border-primary' : 'bg-white border-primary/15'
-                      }`}
+                      className={`px-3 py-1.5 rounded-xl border-2 ${variantWeight === w ? 'bg-primary border-primary' : 'bg-white border-primary/15'
+                        }`}
                     >
                       <Text className={`font-quicksand-bold text-[11px] ${variantWeight === w ? 'text-white' : 'text-gray-700'}`}>
                         {w}

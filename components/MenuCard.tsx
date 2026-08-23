@@ -23,15 +23,18 @@ const MenuCard = ({ item }: MenuCardProps) => {
   const cartItem = items.find((i) => i.id === $id)
   const quantity = cartItem?.quantity || 0
 
+  const isSale = discountPrice && discountPrice < price
+  const effectivePrice = isSale ? discountPrice : price
+
   const handleAddToCart = (e: any) => {
     e.stopPropagation()
     addItem({
       id: $id,
       name,
-      price,
+      price: effectivePrice,
       image_url: imageUrl,
       customizations: [],
-      sellerId: item.sellerId,
+      sellerId: item.sellerId || (item as any).seller_id || (item as any).storeId,
     })
   }
 
@@ -51,12 +54,12 @@ const MenuCard = ({ item }: MenuCardProps) => {
       onPress={() => router.push({ pathname: '/product/[id]', params: { id: $id } })}
       className="bg-white rounded-[28px] p-3 border-2 border-primary/10 shadow-md shadow-black/5 flex-1 justify-between"
     >
-      {/* Square Image Box */}
-      <View className="w-full aspect-square bg-gray-50/90 rounded-2xl p-2 items-center justify-center relative overflow-hidden border border-primary/5 mb-2.5">
+      {/* Rectangle Image Box */}
+      <View className="w-full aspect-[4/3] bg-gray-50/90 rounded-2xl items-center justify-center relative overflow-hidden border border-primary/5 mb-2.5">
         <FastImage
           source={imageUrl}
           className="w-full h-full"
-          contentFit="contain"
+          contentFit="cover"
         />
 
         {/* Rating / Category Mini Pill */}
@@ -73,11 +76,20 @@ const MenuCard = ({ item }: MenuCardProps) => {
           </View>
         ) : null}
 
-        {discountPrice && discountPrice < price ? (
-          <View className="absolute top-2 right-2 bg-red-500 px-1.5 py-0.5 rounded-full">
-            <Text className="text-[9px] font-quicksand-bold text-white uppercase">Sale</Text>
+        {isSale ? (
+          <View className="absolute top-2 right-2 bg-red-500 px-2 py-0.5 rounded-full shadow-sm">
+            <Text className="text-[9px] font-quicksand-bold text-white uppercase tracking-wider">Sale</Text>
           </View>
         ) : null}
+
+        {/* Proximity Distance Badge */}
+        {(item as any).distanceKm != null && (item as any).distanceKm < 100 && (
+          <View className="absolute bottom-2 left-2 bg-black/65 px-2 py-0.5 rounded-full backdrop-blur-md">
+            <Text className="text-[9px] font-quicksand-bold text-white">
+              📍 {(item as any).distanceKm} km
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Product Details */}
@@ -90,20 +102,34 @@ const MenuCard = ({ item }: MenuCardProps) => {
             {name}
           </Text>
           <Text className="text-gray-400 font-quicksand-medium text-[11px] mt-0.5" numberOfLines={1}>
-            Fresh & Daily Essentials
+            {item.description ? item.description : ((item as any).categories || item.type || 'Fresh & Daily Essentials')}
           </Text>
         </View>
 
         {/* Bottom Price & Add / Incrementor Actions */}
         <View className="flex-row items-center justify-between pt-2 border-t border-primary/5 min-h-[36px]">
-          <View>
-            <Text className="text-primary font-quicksand-bold text-base">
-              ₦ {Number(price || 0).toLocaleString()}
-            </Text>
+          <View className="flex-1 mr-2">
+            {isSale ? (
+              <View className="flex-row items-baseline flex-wrap">
+                <Text className="text-primary font-quicksand-bold text-base mr-1.5">
+                  ₦ {Number(discountPrice).toLocaleString()}
+                </Text>
+                <Text className="text-gray-400 font-quicksand-medium text-[11px] line-through">
+                  ₦ {Number(price).toLocaleString()}
+                </Text>
+              </View>
+            ) : (
+              <Text className="text-primary font-quicksand-bold text-base">
+                ₦ {Number(price || 0).toLocaleString()}
+              </Text>
+            )}
           </View>
 
           {quantity > 0 ? (
-            <View className="flex-row items-center bg-primary rounded-full px-1.5 py-1 shadow-md shadow-primary/30">
+            <View
+              className="flex-row items-center bg-primary rounded-full px-1.5 py-1 shadow-md shadow-primary/30"
+              style={{ backgroundColor: '#53B175' }}
+            >
               <TouchableOpacity
                 onPress={handleDecrease}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -128,6 +154,7 @@ const MenuCard = ({ item }: MenuCardProps) => {
             <TouchableOpacity
               onPress={handleAddToCart}
               className="bg-primary w-8 h-8 rounded-full items-center justify-center shadow-md shadow-primary/30 active:scale-95"
+              style={{ backgroundColor: '#53B175' }}
             >
               <Text className="text-white font-quicksand-bold text-base leading-none">+</Text>
             </TouchableOpacity>

@@ -1,11 +1,15 @@
-import React from 'react'
-import { Text, TouchableOpacity, View } from 'react-native'
-import { useRouter } from 'expo-router'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useCartStore } from '@/store/cart.store'
 import FastImage from '@/components/FastImage'
+import { useCartStore } from '@/store/cart.store'
+import { useRouter } from 'expo-router'
+import React from 'react'
+import { Platform, Text, TouchableOpacity, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-export default function FloatingCartPill() {
+interface FloatingCartPillProps {
+  bottomOffset?: number
+}
+
+export default function FloatingCartPill({ bottomOffset: customBottomOffset }: FloatingCartPillProps = {}) {
   const insets = useSafeAreaInsets()
   const router = useRouter()
   const { items, getTotalItems, getTotalPrice } = useCartStore()
@@ -21,7 +25,16 @@ export default function FloatingCartPill() {
     .filter(Boolean)
     .slice(0, 3)
 
-  const bottomOffset = (insets.bottom || 0) + 85
+  const safeBottom = Platform.OS === 'ios'
+    ? Math.max(insets.bottom || 0, 12)
+    : (insets.bottom > 0 ? insets.bottom : 0)
+
+  // Bottom tab bar height is 70. Pill sits 10px directly above the bottom nav bar (70 + 10 = 80).
+  const defaultTabPillOffset = safeBottom + 80
+
+  const bottomOffset = customBottomOffset !== undefined
+    ? customBottomOffset
+    : defaultTabPillOffset
 
   return (
     <View
@@ -32,6 +45,7 @@ export default function FloatingCartPill() {
         onPress={() => router.push('/cart' as any)}
         activeOpacity={0.9}
         className="bg-primary rounded-full px-5 py-3 flex-row items-center justify-between shadow-2xl shadow-primary/40 border-2 border-white self-stretch max-w-sm mx-auto"
+        style={{ backgroundColor: '#53B175' }}
       >
         {/* Stacked Product Thumbnails */}
         <View className="flex-row items-center mr-3">
@@ -41,9 +55,8 @@ export default function FloatingCartPill() {
                 <FastImage
                   key={idx}
                   source={uri}
-                  className={`w-9 h-9 rounded-full border-2 border-white bg-white ${
-                    idx > 0 ? '-ml-4' : ''
-                  }`}
+                  className={`w-9 h-9 rounded-full border-2 border-white bg-white ${idx > 0 ? '-ml-4' : ''
+                    }`}
                   contentFit="cover"
                 />
               ))}

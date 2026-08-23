@@ -43,7 +43,7 @@ const CartItem = ({ item }: { item: CartItemType }) => {
           </Text>
 
           <View className="flex-row items-center mt-3">
-            <View className="flex-row items-center bg-bg-light rounded-full px-3 py-1.5 border border-primary/10">
+            <View className="flex-row items-center bg-white rounded-full px-3 py-1.5 border border-primary/20">
               <TouchableOpacity
                 onPress={() =>
                   decreaseQty(item.id, item.customizations!)
@@ -54,7 +54,7 @@ const CartItem = ({ item }: { item: CartItemType }) => {
                   source={images.minus}
                   className="w-3 h-3"
                   resizeMode="contain"
-                  tintColor="#16A34A"
+                  tintColor="#53B175"
                 />
               </TouchableOpacity>
 
@@ -72,7 +72,7 @@ const CartItem = ({ item }: { item: CartItemType }) => {
                   source={images.plus}
                   className="w-3 h-3"
                   resizeMode="contain"
-                  tintColor="#16A34A"
+                  tintColor="#53B175"
                 />
               </TouchableOpacity>
             </View>

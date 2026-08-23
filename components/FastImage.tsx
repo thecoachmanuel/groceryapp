@@ -40,7 +40,7 @@ export default function FastImage({
   if (hasError || !source) {
     return (
       <View className={`relative overflow-hidden bg-emerald-50 items-center justify-center ${className}`} style={style}>
-        <ActivityIndicator size="small" color="#16A34A" />
+        <ActivityIndicator size="small" color="#53B175" />
       </View>
     )
   }
@@ -63,7 +63,7 @@ export default function FastImage({
       />
       {isLoading && (
         <View className="absolute inset-0 items-center justify-center bg-gray-100/50">
-          <ActivityIndicator size="small" color="#16A34A" />
+          <ActivityIndicator size="small" color="#53B175" />
         </View>
       )}
     </View>

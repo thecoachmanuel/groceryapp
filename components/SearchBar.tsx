@@ -67,7 +67,7 @@ const Searchbar = ({
             source={(images as any).close || images.trash}
             className="w-3.5 h-3.5"
             resizeMode="contain"
-            tintColor="#16A34A"
+            tintColor="#53B175"
           />
         </TouchableOpacity>
       )}

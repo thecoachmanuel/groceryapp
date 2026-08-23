@@ -1,3 +1,16 @@
+import { images } from '@/constants'
+import {
+  createProduct,
+  deleteProduct,
+  deleteStorageFileByUrl,
+  getCategories,
+  getMenu,
+  updateProduct,
+  uploadImageToStorage,
+} from '@/lib/appwrite'
+import useAuthStore from '@/store/auth.store'
+import * as ImagePicker from 'expo-image-picker'
+import { useRouter } from 'expo-router'
 import React, { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
@@ -13,18 +26,6 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
-import * as ImagePicker from 'expo-image-picker'
-import useAuthStore from '@/store/auth.store'
-import {
-  getMenu,
-  createProduct,
-  updateProduct,
-  deleteProduct,
-  getCategories,
-  uploadImageToStorage,
-} from '@/lib/appwrite'
-import { images } from '@/constants'
 
 export default function SellerProducts() {
 
@@ -163,6 +164,9 @@ export default function SellerProducts() {
       let finalImageUrl = imageUri || 'https://cloud.appwrite.io/v1/storage/buckets/placeholder/files/view'
 
       if (imageUri && !imageUri.startsWith('http')) {
+        if (editingProduct?.image_url || editingProduct?.imageUrl) {
+          await deleteStorageFileByUrl(editingProduct.image_url || editingProduct.imageUrl)
+        }
         finalImageUrl = await uploadImageToStorage(imageUri, 'prod')
       }
 
@@ -218,7 +222,7 @@ export default function SellerProducts() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
       {/* Header */}
       <View className="px-5 pt-4 pb-3 flex-row justify-between items-center bg-white border-b border-primary/10">
         <TouchableOpacity
@@ -240,6 +244,7 @@ export default function SellerProducts() {
         <TouchableOpacity
           onPress={openCreateModal}
           className="bg-primary px-3 py-2 rounded-2xl flex-row items-center shadow-md shadow-primary/30 active:opacity-80"
+          style={{ backgroundColor: '#53B175' }}
         >
           <Text className="text-white font-quicksand-bold text-xs">+ Add Item</Text>
         </TouchableOpacity>
@@ -247,7 +252,7 @@ export default function SellerProducts() {
 
       {loading ? (
         <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color="#16A34A" />
+          <ActivityIndicator size="large" color="#53B175" />
         </View>
       ) : (
         <FlatList
@@ -394,9 +399,8 @@ export default function SellerProducts() {
                     <TouchableOpacity
                       key={cat.$id || cat.name}
                       onPress={() => setSelectedCategory(cat.name)}
-                      className={`px-3.5 py-2.5 rounded-2xl border-2 mr-2 flex-row items-center ${
-                        isSelected ? 'bg-primary border-primary' : 'bg-gray-50 border-gray-200'
-                      }`}
+                      className={`px-3.5 py-2.5 rounded-2xl border-2 mr-2 flex-row items-center ${isSelected ? 'bg-primary border-primary' : 'bg-gray-50 border-gray-200'
+                        }`}
                     >
                       <Text className={`font-quicksand-bold text-xs ${isSelected ? 'text-white' : 'text-gray-700'}`}>
                         🏷️ {cat.name}
@@ -430,10 +434,10 @@ export default function SellerProducts() {
                 className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-dark-100 font-quicksand-semibold mb-4 min-h-[80px]"
               />
 
-              {/* Price & Stock Row */}
-              <View className="flex-row gap-3 mb-4">
+              {/* Price, Discount Price & Stock Row */}
+              <View className="flex-row gap-2 mb-4">
                 <View className="flex-1">
-                  <Text className="font-quicksand-bold text-sm text-dark-100 mb-1">
+                  <Text className="font-quicksand-bold text-xs text-dark-100 mb-1">
                     Base Price (₦) *
                   </Text>
                   <TextInput
@@ -441,20 +445,34 @@ export default function SellerProducts() {
                     placeholder="1500"
                     value={price}
                     onChangeText={setPrice}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-dark-100 font-quicksand-semibold"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-3 py-3 text-dark-100 font-quicksand-semibold text-xs"
                   />
                 </View>
 
                 <View className="flex-1">
-                  <Text className="font-quicksand-bold text-sm text-dark-100 mb-1">
-                    Stock Quantity
+                  <Text className="font-quicksand-bold text-xs text-red-500 mb-1">
+                    Sale Price (₦)
+                  </Text>
+                  <TextInput
+                    keyboardType="numeric"
+                    placeholder="e.g. 1200"
+                    placeholderTextColor="#9CA3AF"
+                    value={discountPrice}
+                    onChangeText={setDiscountPrice}
+                    className="w-full bg-gray-50 border border-red-300 rounded-2xl px-3 py-3 text-red-600 font-quicksand-bold text-xs"
+                  />
+                </View>
+
+                <View className="flex-1">
+                  <Text className="font-quicksand-bold text-xs text-dark-100 mb-1">
+                    Stock Units
                   </Text>
                   <TextInput
                     keyboardType="numeric"
                     placeholder="50"
                     value={stock}
                     onChangeText={setStock}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-dark-100 font-quicksand-semibold"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-3 py-3 text-dark-100 font-quicksand-semibold text-xs"
                   />
                 </View>
               </View>
@@ -477,9 +495,8 @@ export default function SellerProducts() {
                     <TouchableOpacity
                       key={w}
                       onPress={() => setVariantWeight(w)}
-                      className={`px-2.5 py-1 rounded-xl border ${
-                        variantWeight === w ? 'bg-primary border-primary' : 'bg-white border-gray-300'
-                      }`}
+                      className={`px-2.5 py-1 rounded-xl border ${variantWeight === w ? 'bg-primary border-primary' : 'bg-white border-gray-300'
+                        }`}
                     >
                       <Text className={`font-quicksand-bold text-[11px] ${variantWeight === w ? 'text-white' : 'text-gray-700'}`}>
                         {w}

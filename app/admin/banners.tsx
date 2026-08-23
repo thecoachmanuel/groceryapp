@@ -193,7 +193,7 @@ export default function AdminBanners() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
       {/* Header */}
       <View className="px-5 pt-4 pb-3 flex-row justify-between items-center bg-white border-b border-primary/10">
         <TouchableOpacity
@@ -222,7 +222,7 @@ export default function AdminBanners() {
 
       {loading ? (
         <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color="#16A34A" />
+          <ActivityIndicator size="large" color="#53B175" />
         </View>
       ) : (
         <FlatList

@@ -129,10 +129,10 @@ export default function CustomerWalletScreen() {
 
   return (
     <View style={s.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#16A34A" />
+      <StatusBar barStyle="light-content" backgroundColor="#53B175" />
 
       {/* Hero Header — Spans seamlessly into status bar */}
-      <View style={{ backgroundColor: '#16A34A', borderBottomLeftRadius: 45, borderBottomRightRadius: 45 }}>
+      <View style={{ backgroundColor: '#53B175', borderBottomLeftRadius: 45, borderBottomRightRadius: 45 }}>
         <SafeAreaView edges={['top']} style={s.hero}>
           <View style={s.heroRow}>
             <TouchableOpacity
@@ -161,7 +161,7 @@ export default function CustomerWalletScreen() {
 
         {creditingWallet ? (
           <View style={s.creditingRow}>
-            <ActivityIndicator color="#16A34A" size="small" />
+            <ActivityIndicator color="#53B175" size="small" />
             <Text style={s.creditingText}>Crediting wallet…</Text>
           </View>
         ) : (
@@ -190,7 +190,7 @@ export default function CustomerWalletScreen() {
 
         {loading ? (
           <View style={s.loadingWrap}>
-            <ActivityIndicator size="large" color="#16A34A" />
+            <ActivityIndicator size="large" color="#53B175" />
           </View>
         ) : (
           <FlatList
@@ -198,7 +198,7 @@ export default function CustomerWalletScreen() {
             keyExtractor={(item, index) => (item?.$id ? String(item.$id) : `tx_${index}`)}
             contentContainerStyle={{ paddingBottom: 120 }}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#16A34A']} tintColor="#16A34A" />
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#53B175']} tintColor="#53B175" />
             }
             ListEmptyComponent={() => (
               <View style={s.emptyWrap}>
@@ -209,16 +209,59 @@ export default function CustomerWalletScreen() {
             )}
             renderItem={({ item }) => {
               const isCredit = item?.type === 'credit'
+              const cat = item?.category || ''
+
+              let iconEmoji = '📤'
+              let iconBgStyle = s.txIconDebit
+              let categoryBadge = ''
+              let badgeBgStyle = s.badgeDefault
+              let badgeTextStyle = s.badgeTextDefault
+
+              if (isCredit) {
+                iconEmoji = '📥'
+                iconBgStyle = s.txIconCredit
+                categoryBadge = 'Wallet Top-Up'
+                badgeBgStyle = s.badgeCredit
+                badgeTextStyle = s.badgeTextCredit
+              } else if (cat === 'split_wallet_payment') {
+                iconEmoji = '👛'
+                categoryBadge = 'Split (Wallet Portion)'
+                badgeBgStyle = s.badgeSplitWallet
+                badgeTextStyle = s.badgeTextSplitWallet
+              } else if (cat === 'split_paystack_payment') {
+                iconEmoji = '💳'
+                categoryBadge = 'Split (Paystack Card)'
+                badgeBgStyle = s.badgePaystack
+                badgeTextStyle = s.badgeTextPaystack
+              } else if (cat === 'paystack_card_payment') {
+                iconEmoji = '💳'
+                categoryBadge = 'Paystack Card'
+                badgeBgStyle = s.badgePaystack
+                badgeTextStyle = s.badgeTextPaystack
+              } else if (cat === 'wallet_order_payment' || cat === 'order_payment') {
+                iconEmoji = '🛒'
+                categoryBadge = 'Wallet Checkout'
+                badgeBgStyle = s.badgeWallet
+                badgeTextStyle = s.badgeTextWallet
+              }
+
               return (
                 <View style={s.txItem}>
-                  <View style={[s.txIcon, isCredit ? s.txIconCredit : s.txIconDebit]}>
-                    <Text style={{ fontSize: 20 }}>{isCredit ? '📥' : '📤'}</Text>
+                  <View style={[s.txIcon, iconBgStyle]}>
+                    <Text style={{ fontSize: 20 }}>{iconEmoji}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.txDesc} numberOfLines={1}>
                       {item?.description || (isCredit ? 'Wallet Credit' : 'Wallet Debit')}
                     </Text>
-                    <Text style={s.txDate}>{formatDate(item?.createdAt)}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6, flexWrap: 'wrap' }}>
+                      <Text style={s.txDate}>{formatDate(item?.createdAt)}</Text>
+                      {categoryBadge ? (
+                        <View style={[s.badgePill, badgeBgStyle]}>
+                          <Text style={[s.badgePillText, badgeTextStyle]}>{categoryBadge}</Text>
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
                   <Text style={[s.txAmount, isCredit ? s.txAmountCredit : s.txAmountDebit]}>
                     {isCredit ? '+' : '-'}₦{Number(item?.amount || 0).toLocaleString()}
@@ -328,10 +371,10 @@ export default function CustomerWalletScreen() {
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#E6F7EC' },
+  root: { flex: 1, backgroundColor: '#FFFFFF' },
 
   // Hero
-  hero: { backgroundColor: '#16A34A', borderBottomLeftRadius: 45, borderBottomRightRadius: 45, paddingHorizontal: 24, paddingTop: 10, paddingBottom: 56 },
+  hero: { backgroundColor: '#53B175', borderBottomLeftRadius: 45, borderBottomRightRadius: 45, paddingHorizontal: 24, paddingTop: 10, paddingBottom: 56 },
   heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   backBtn: { width: 40, height: 40, backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   backIcon: { width: 20, height: 20 },
@@ -344,10 +387,10 @@ const s = StyleSheet.create({
   balanceCard: { marginTop: -32, marginHorizontal: 20, backgroundColor: '#fff', borderRadius: 32, padding: 24, shadowColor: '#000', shadowOpacity: 0.1, shadowOffset: { width: 0, height: 8 }, shadowRadius: 24, elevation: 8, borderWidth: 2, borderColor: '#dcfce7' },
   balanceLabel: { fontSize: 11, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 1, fontWeight: '600' },
   balanceAmount: { fontSize: 36, fontWeight: '700', color: '#1a1a2e', marginTop: 4 },
-  balanceDivider: { height: 2, width: 48, backgroundColor: '#16A34A', borderRadius: 999, marginVertical: 12 },
+  balanceDivider: { height: 2, width: 48, backgroundColor: '#53B175', borderRadius: 999, marginVertical: 12 },
   creditingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, gap: 8 },
-  creditingText: { color: '#16A34A', fontWeight: '700', fontSize: 14 },
-  fundBtn: { backgroundColor: '#16A34A', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#16A34A', shadowOpacity: 0.3, shadowOffset: { width: 0, height: 6 }, shadowRadius: 12 },
+  creditingText: { color: '#53B175', fontWeight: '700', fontSize: 14 },
+  fundBtn: { backgroundColor: '#53B175', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#53B175', shadowOpacity: 0.3, shadowOffset: { width: 0, height: 6 }, shadowRadius: 12 },
   fundBtnEmoji: { fontSize: 20, marginRight: 8 },
   fundBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
   refundWarning: { marginTop: 12, backgroundColor: 'rgba(239,68,68,0.05)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center' },
@@ -356,42 +399,55 @@ const s = StyleSheet.create({
   // Transactions
   txSection: { flex: 1, paddingHorizontal: 20, marginTop: 24 },
   txHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  txDot: { width: 10, height: 10, backgroundColor: '#16A34A', borderRadius: 999, marginRight: 8 },
+  txDot: { width: 10, height: 10, backgroundColor: '#53B175', borderRadius: 999, marginRight: 8 },
   txTitle: { color: '#1a1a2e', fontSize: 18, fontWeight: '700' },
-  txDivider: { height: 1, backgroundColor: 'rgba(22,163,74,0.1)', marginBottom: 16 },
+  txDivider: { height: 1, backgroundColor: 'rgba(83, 177, 117,0.1)', marginBottom: 16 },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 },
   emptyWrap: { alignItems: 'center', marginTop: 48, paddingHorizontal: 24 },
   emptyEmoji: { fontSize: 40, marginBottom: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a2e', marginBottom: 4 },
   emptySub: { fontSize: 12, color: '#9ca3af', textAlign: 'center' },
-  txItem: { backgroundColor: '#fff', borderRadius: 28, padding: 20, marginBottom: 14, borderWidth: 2, borderColor: '#dcfce7', shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: 2 }, shadowRadius: 8, elevation: 2, flexDirection: 'row', alignItems: 'center', gap: 14 },
+  txItem: { backgroundColor: '#fff', borderRadius: 28, padding: 20, marginBottom: 14, borderWidth: 2, borderColor: 'rgba(83, 177, 117, 0.15)', shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: 2 }, shadowRadius: 8, elevation: 2, flexDirection: 'row', alignItems: 'center', gap: 14 },
   txIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
-  txIconCredit: { backgroundColor: 'rgba(34,197,94,0.1)', borderColor: 'rgba(34,197,94,0.3)' },
+  txIconCredit: { backgroundColor: 'rgba(83, 177, 117, 0.1)', borderColor: 'rgba(83, 177, 117, 0.3)' },
   txIconDebit: { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' },
   txDesc: { fontWeight: '700', fontSize: 14, color: '#1a1a2e' },
   txDate: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
   txAmount: { fontWeight: '700', fontSize: 15 },
-  txAmountCredit: { color: '#16a34a' },
+  txAmountCredit: { color: '#53B175' },
   txAmountDebit: { color: '#dc2626' },
+
+  badgePill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
+  badgePillText: { fontSize: 10, fontWeight: '700' },
+  badgeCredit: { backgroundColor: 'rgba(83, 177, 117, 0.15)' },
+  badgeTextCredit: { color: '#53B175' },
+  badgeSplitWallet: { backgroundColor: 'rgba(147,51,234,0.12)' },
+  badgeTextSplitWallet: { color: '#7e22ce' },
+  badgePaystack: { backgroundColor: 'rgba(59,130,246,0.12)' },
+  badgeTextPaystack: { color: '#2563eb' },
+  badgeWallet: { backgroundColor: 'rgba(83, 177, 117, 0.12)' },
+  badgeTextWallet: { color: '#53B175' },
+  badgeDefault: { backgroundColor: '#f3f4f6' },
+  badgeTextDefault: { color: '#6b7280' },
 
   // Modal
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.4)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 40, borderTopRightRadius: 40, borderTopWidth: 2, borderColor: '#dcfce7' },
+  modalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 40, borderTopRightRadius: 40, borderTopWidth: 2, borderColor: 'rgba(83, 177, 117, 0.2)' },
   modalHandle: { width: 40, height: 4, backgroundColor: '#e5e7eb', borderRadius: 999, alignSelf: 'center', marginBottom: 20 },
-  modalIcon: { width: 64, height: 64, backgroundColor: 'rgba(22,163,74,0.1)', borderRadius: 999, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 12, borderWidth: 2, borderColor: 'rgba(22,163,74,0.2)' },
+  modalIcon: { width: 64, height: 64, backgroundColor: 'rgba(83, 177, 117,0.1)', borderRadius: 999, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 12, borderWidth: 2, borderColor: 'rgba(83, 177, 117,0.2)' },
   modalTitle: { fontWeight: '700', fontSize: 22, color: '#1a1a2e', textAlign: 'center', marginBottom: 4 },
   modalSub: { fontSize: 12, color: '#9ca3af', textAlign: 'center', marginBottom: 20, paddingHorizontal: 16 },
   inputLabel: { fontWeight: '700', fontSize: 11, color: '#9ca3af', marginBottom: 6, letterSpacing: 0.5 },
-  amountInput: { backgroundColor: '#fff', borderWidth: 2, borderColor: '#dcfce7', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, fontSize: 20, color: '#1a1a2e', marginBottom: 16 },
-  amountInputActive: { borderColor: '#16A34A' },
+  amountInput: { backgroundColor: '#fff', borderWidth: 2, borderColor: 'rgba(83, 177, 117, 0.2)', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, fontSize: 20, color: '#1a1a2e', marginBottom: 16 },
+  amountInputActive: { borderColor: '#53B175' },
   pillRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
-  pill: { flex: 1, paddingVertical: 10, borderRadius: 999, borderWidth: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', borderColor: '#dcfce7' },
-  pillActive: { backgroundColor: '#16A34A', borderColor: '#16A34A' },
+  pill: { flex: 1, paddingVertical: 10, borderRadius: 999, borderWidth: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', borderColor: 'rgba(83, 177, 117, 0.2)' },
+  pillActive: { backgroundColor: '#53B175', borderColor: '#53B175' },
   pillText: { fontWeight: '700', fontSize: 11, color: '#1a1a2e' },
   pillTextActive: { color: '#fff' },
-  secureNotice: { backgroundColor: 'rgba(22,163,74,0.05)', borderWidth: 1, borderColor: 'rgba(22,163,74,0.2)', borderRadius: 16, padding: 12, marginBottom: 20, flexDirection: 'row', alignItems: 'center' },
+  secureNotice: { backgroundColor: 'rgba(83, 177, 117,0.05)', borderWidth: 1, borderColor: 'rgba(83, 177, 117,0.2)', borderRadius: 16, padding: 12, marginBottom: 20, flexDirection: 'row', alignItems: 'center' },
   secureNoticeText: { fontSize: 11, color: '#6b7280', flex: 1 },
-  payBtn: { backgroundColor: '#16A34A', borderRadius: 999, paddingVertical: 16, alignItems: 'center', marginBottom: 12, shadowColor: '#16A34A', shadowOpacity: 0.3, shadowOffset: { width: 0, height: 6 }, shadowRadius: 12, elevation: 6 },
+  payBtn: { backgroundColor: '#53B175', borderRadius: 999, paddingVertical: 16, alignItems: 'center', marginBottom: 12, shadowColor: '#53B175', shadowOpacity: 0.3, shadowOffset: { width: 0, height: 6 }, shadowRadius: 12, elevation: 6 },
   payBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
   cancelBtn: { backgroundColor: 'rgba(239,68,68,0.08)', borderWidth: 2, borderColor: 'rgba(239,68,68,0.2)', borderRadius: 999, paddingVertical: 14, alignItems: 'center' },
   cancelBtnText: { color: '#dc2626', fontWeight: '700', fontSize: 14 },

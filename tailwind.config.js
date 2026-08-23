@@ -5,9 +5,9 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: '#16A34A',
+        primary: '#53B175',
         bg: {
-          light: '#E6F7EC',
+          light: '#ffffff',
         },
         white: {
           DEFAULT: '#ffffff',
@@ -22,14 +22,14 @@ module.exports = {
           100: '#181C2E',
         },
         error: '#F14141',
-        success: '#2F9B65',
+        success: '#53B175',
       },
       fontFamily: {
-        quicksand: ['Quicksand-Regular', 'sans-serif'],
-        'quicksand-bold': ['Quicksand-Bold', 'sans-serif'],
-        'quicksand-semibold': ['Quicksand-SemiBold', 'sans-serif'],
-        'quicksand-light': ['Quicksand-Light', 'sans-serif'],
-        'quicksand-medium': ['Quicksand-Medium', 'sans-serif'],
+        quicksand: ['Quicksand-Regular', 'QuickSand-Regular', 'sans-serif'],
+        'quicksand-bold': ['Quicksand-Bold', 'QuickSand-Bold', 'sans-serif'],
+        'quicksand-semibold': ['Quicksand-SemiBold', 'QuickSand-SemiBold', 'sans-serif'],
+        'quicksand-light': ['Quicksand-Light', 'QuickSand-Light', 'sans-serif'],
+        'quicksand-medium': ['Quicksand-Medium', 'QuickSand-Medium', 'sans-serif'],
       },
     },
   },

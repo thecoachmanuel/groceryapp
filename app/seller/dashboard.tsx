@@ -90,17 +90,17 @@ export default function SellerDashboard() {
   const storeName = sellerStore?.storeName || `${user?.name || 'Seller'}'s Store`
 
   return (
-    <View className="flex-1 bg-bg-light">
-      <StatusBar barStyle="light-content" backgroundColor="#16A34A" />
+    <View className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
+      <StatusBar barStyle="light-content" backgroundColor="#53B175" />
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: 100 }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#16A34A']} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#53B175']} />
         }
       >
         {/* Customer App Design Architecture: Curved Primary Hero Header Spanning Status Bar */}
-        <SafeAreaView edges={['top']} className="bg-primary rounded-b-[45px] shadow-lg shadow-black/10">
+        <SafeAreaView edges={['top']} className="bg-primary rounded-b-[45px] shadow-lg shadow-black/10" style={{ backgroundColor: '#53B175' }}>
           <View className="px-6 pt-2 pb-14">
             <View className="flex-row justify-between items-center mb-3">
               <TouchableOpacity
@@ -252,7 +252,7 @@ export default function SellerDashboard() {
 
           {loading ? (
             <View className="py-10 items-center">
-              <ActivityIndicator size="small" color="#16A34A" />
+              <ActivityIndicator size="small" color="#53B175" />
             </View>
           ) : (
             <View className="gap-3.5">
@@ -274,8 +274,8 @@ export default function SellerDashboard() {
                     </Text>
                   </View>
                 </View>
-                <View className="w-9 h-9 rounded-full bg-primary/10 border border-primary/20 items-center justify-center">
-                  <Text className="text-primary font-bold text-base">→</Text>
+                <View className="w-9 h-9 rounded-full bg-primary/10 border border-primary/20 items-center justify-center" style={{ backgroundColor: 'rgba(83, 177, 117, 0.1)', borderColor: 'rgba(83, 177, 117, 0.2)' }}>
+                  <Text className="text-primary font-bold text-base" style={{ color: '#53B175' }}>→</Text>
                 </View>
               </TouchableOpacity>
 
@@ -297,8 +297,8 @@ export default function SellerDashboard() {
                     </Text>
                   </View>
                 </View>
-                <View className="w-9 h-9 rounded-full bg-primary/10 border border-primary/20 items-center justify-center">
-                  <Text className="text-primary font-bold text-base">→</Text>
+                <View className="w-9 h-9 rounded-full bg-primary/10 border border-primary/20 items-center justify-center" style={{ backgroundColor: 'rgba(83, 177, 117, 0.1)', borderColor: 'rgba(83, 177, 117, 0.2)' }}>
+                  <Text className="text-primary font-bold text-base" style={{ color: '#53B175' }}>→</Text>
                 </View>
               </TouchableOpacity>
 
@@ -320,8 +320,8 @@ export default function SellerDashboard() {
                     </Text>
                   </View>
                 </View>
-                <View className="w-9 h-9 rounded-full bg-primary/10 border border-primary/20 items-center justify-center">
-                  <Text className="text-primary font-bold text-base">→</Text>
+                <View className="w-9 h-9 rounded-full bg-primary/10 border border-primary/20 items-center justify-center" style={{ backgroundColor: 'rgba(83, 177, 117, 0.1)', borderColor: 'rgba(83, 177, 117, 0.2)' }}>
+                  <Text className="text-primary font-bold text-base" style={{ color: '#53B175' }}>→</Text>
                 </View>
               </TouchableOpacity>
             </View>

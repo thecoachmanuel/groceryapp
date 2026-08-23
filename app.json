@@ -7,8 +7,8 @@
     "icon": "./assets/images/logo.png",
     "scheme": "groceryapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
+      "bundleIdentifier": "com.grocery.app",
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Grocery App uses your location to deliver groceries to your address.",
@@ -25,7 +25,12 @@
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION"
-      ]
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBApA5GvxiEjCOHAoxfEPwwRDp0Djvifrs"
+        }
+      }
     },
     "web": {
       "bundler": "metro",
@@ -57,6 +62,14 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "updates": {
+      "url": "https://u.expo.dev/336dd4ce-64be-400b-99bf-281dc0a1f6bd",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 3000
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     },
     "extra": {
       "router": {},

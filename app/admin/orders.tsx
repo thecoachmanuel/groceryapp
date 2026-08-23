@@ -1,3 +1,9 @@
+import { images } from '@/constants'
+import { account, getAllOrders, updateOrderStatus } from '@/lib/appwrite'
+import useAuthStore from '@/store/auth.store'
+import useNotificationStore from '@/store/notification.store'
+import { Ionicons } from '@expo/vector-icons'
+import { useFocusEffect, useRouter } from 'expo-router'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
@@ -11,12 +17,6 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useFocusEffect, useRouter } from 'expo-router'
-import { getAllOrders, updateOrderStatus, account } from '@/lib/appwrite'
-import useAuthStore from '@/store/auth.store'
-import useNotificationStore from '@/store/notification.store'
-import { Ionicons } from '@expo/vector-icons'
-import { images } from '@/constants'
 
 function normalizeStatus(rawStatus?: string): 'order_placed' | 'preparing' | 'on_the_way' | 'delivered' | 'cancelled' {
   if (!rawStatus) return 'order_placed'
@@ -198,8 +198,8 @@ export default function AdminOrders() {
   }, [orders, activeFilter])
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
-      <StatusBar barStyle="dark-content" backgroundColor="#E6F7EC" />
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Header */}
       <View className="px-5 pt-4 pb-3 flex-row justify-between items-center bg-white border-b border-primary/10">
@@ -264,23 +264,20 @@ export default function AdminOrders() {
 
           <TouchableOpacity
             onPress={() => setActiveFilter('unfulfilled')}
-            className={`border px-3.5 py-2.5 rounded-2xl items-center ${
-              activeFilter === 'unfulfilled'
+            className={`border px-3.5 py-2.5 rounded-2xl items-center ${activeFilter === 'unfulfilled'
                 ? 'bg-amber-500 border-amber-600'
                 : 'bg-amber-500/15 border-amber-500/30'
-            }`}
+              }`}
           >
             <Text
-              className={`font-quicksand-bold text-base ${
-                activeFilter === 'unfulfilled' ? 'text-white' : 'text-amber-800'
-              }`}
+              className={`font-quicksand-bold text-base ${activeFilter === 'unfulfilled' ? 'text-white' : 'text-amber-800'
+                }`}
             >
               {metrics.unfulfilledCount}
             </Text>
             <Text
-              className={`text-[9px] font-quicksand-bold uppercase ${
-                activeFilter === 'unfulfilled' ? 'text-white' : 'text-amber-800'
-              }`}
+              className={`text-[9px] font-quicksand-bold uppercase ${activeFilter === 'unfulfilled' ? 'text-white' : 'text-amber-800'
+                }`}
             >
               Action Req.
             </Text>
@@ -291,11 +288,10 @@ export default function AdminOrders() {
         <View className="flex-row gap-2 mt-3 pt-3 border-t border-primary/10">
           <TouchableOpacity
             onPress={() => setActiveFilter('order_placed')}
-            className={`flex-1 p-2 rounded-xl border items-center ${
-              activeFilter === 'order_placed'
+            className={`flex-1 p-2 rounded-xl border items-center ${activeFilter === 'order_placed'
                 ? 'bg-blue-500 border-blue-600'
                 : 'bg-blue-50/70 border-blue-200'
-            }`}
+              }`}
           >
             <Text className={`text-[10px] font-quicksand-bold ${activeFilter === 'order_placed' ? 'text-white' : 'text-blue-700'}`}>
               📦 Placed: {metrics.placed}
@@ -304,11 +300,10 @@ export default function AdminOrders() {
 
           <TouchableOpacity
             onPress={() => setActiveFilter('preparing')}
-            className={`flex-1 p-2 rounded-xl border items-center ${
-              activeFilter === 'preparing'
+            className={`flex-1 p-2 rounded-xl border items-center ${activeFilter === 'preparing'
                 ? 'bg-amber-500 border-amber-600'
                 : 'bg-amber-50/70 border-amber-200'
-            }`}
+              }`}
           >
             <Text className={`text-[10px] font-quicksand-bold ${activeFilter === 'preparing' ? 'text-white' : 'text-amber-700'}`}>
               🍳 Prep: {metrics.preparing}
@@ -317,11 +312,10 @@ export default function AdminOrders() {
 
           <TouchableOpacity
             onPress={() => setActiveFilter('on_the_way')}
-            className={`flex-1 p-2 rounded-xl border items-center ${
-              activeFilter === 'on_the_way'
+            className={`flex-1 p-2 rounded-xl border items-center ${activeFilter === 'on_the_way'
                 ? 'bg-purple-500 border-purple-600'
                 : 'bg-purple-50/70 border-purple-200'
-            }`}
+              }`}
           >
             <Text className={`text-[10px] font-quicksand-bold ${activeFilter === 'on_the_way' ? 'text-white' : 'text-purple-700'}`}>
               🛵 Transit: {metrics.onTheWay}
@@ -343,43 +337,39 @@ export default function AdminOrders() {
               item.key === 'unfulfilled'
                 ? metrics.unfulfilledCount
                 : item.key === 'all'
-                ? metrics.allCount
-                : item.key === 'order_placed'
-                ? metrics.placed
-                : item.key === 'preparing'
-                ? metrics.preparing
-                : item.key === 'on_the_way'
-                ? metrics.onTheWay
-                : item.key === 'delivered'
-                ? metrics.delivered
-                : metrics.cancelled
+                  ? metrics.allCount
+                  : item.key === 'order_placed'
+                    ? metrics.placed
+                    : item.key === 'preparing'
+                      ? metrics.preparing
+                      : item.key === 'on_the_way'
+                        ? metrics.onTheWay
+                        : item.key === 'delivered'
+                          ? metrics.delivered
+                          : metrics.cancelled
 
             return (
               <TouchableOpacity
                 onPress={() => setActiveFilter(item.key)}
-                className={`px-3.5 py-2 rounded-full mr-2.5 border-2 flex-row items-center ${
-                  isSelected
+                className={`px-3.5 py-2 rounded-full mr-2.5 border-2 flex-row items-center ${isSelected
                     ? 'bg-primary border-primary'
                     : 'bg-white border-primary/15'
-                }`}
+                  }`}
               >
                 <Text
-                  className={`font-quicksand-bold text-xs ${
-                    isSelected ? 'text-white' : 'text-dark-100'
-                  }`}
+                  className={`font-quicksand-bold text-xs ${isSelected ? 'text-white' : 'text-dark-100'
+                    }`}
                 >
                   {item.label}
                 </Text>
                 {badge !== undefined && (
                   <View
-                    className={`ml-1.5 px-2 py-0.5 rounded-full ${
-                      isSelected ? 'bg-white/30' : 'bg-primary/10'
-                    }`}
+                    className={`ml-1.5 px-2 py-0.5 rounded-full ${isSelected ? 'bg-white/30' : 'bg-primary/10'
+                      }`}
                   >
                     <Text
-                      className={`text-[10px] font-bold ${
-                        isSelected ? 'text-white' : 'text-primary'
-                      }`}
+                      className={`text-[10px] font-bold ${isSelected ? 'text-white' : 'text-primary'
+                        }`}
                     >
                       {badge}
                     </Text>
@@ -393,7 +383,7 @@ export default function AdminOrders() {
 
       {loading ? (
         <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color="#16A34A" />
+          <ActivityIndicator size="large" color="#53B175" />
         </View>
       ) : (
         <FlatList
@@ -401,7 +391,7 @@ export default function AdminOrders() {
           keyExtractor={(item, index) => item?.$id || String(index)}
           contentContainerStyle={{ padding: 20, paddingBottom: 140 }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#16A34A']} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#53B175']} />
           }
           ListEmptyComponent={() => (
             <View className="items-center mt-12 px-6">
@@ -450,30 +440,28 @@ export default function AdminOrders() {
                   </View>
 
                   <View
-                    className={`px-3 py-1 rounded-full border ${
-                      norm === 'delivered'
+                    className={`px-3 py-1 rounded-full border ${norm === 'delivered'
                         ? 'bg-green-500/10 border-green-500/20'
                         : norm === 'cancelled'
-                        ? 'bg-red-500/10 border-red-500/20'
-                        : norm === 'preparing'
-                        ? 'bg-amber-500/10 border-amber-500/30'
-                        : norm === 'on_the_way'
-                        ? 'bg-purple-500/10 border-purple-500/30'
-                        : 'bg-blue-500/10 border-blue-500/30'
-                    }`}
+                          ? 'bg-red-500/10 border-red-500/20'
+                          : norm === 'preparing'
+                            ? 'bg-amber-500/10 border-amber-500/30'
+                            : norm === 'on_the_way'
+                              ? 'bg-purple-500/10 border-purple-500/30'
+                              : 'bg-blue-500/10 border-blue-500/30'
+                      }`}
                   >
                     <Text
-                      className={`font-quicksand-bold text-xs capitalize ${
-                        norm === 'delivered'
+                      className={`font-quicksand-bold text-xs capitalize ${norm === 'delivered'
                           ? 'text-green-700'
                           : norm === 'cancelled'
-                          ? 'text-red-600'
-                          : norm === 'preparing'
-                          ? 'text-amber-700'
-                          : norm === 'on_the_way'
-                          ? 'text-purple-700'
-                          : 'text-blue-700'
-                      }`}
+                            ? 'text-red-600'
+                            : norm === 'preparing'
+                              ? 'text-amber-700'
+                              : norm === 'on_the_way'
+                                ? 'text-purple-700'
+                                : 'text-blue-700'
+                        }`}
                     >
                       {norm.replace(/_/g, ' ')}
                     </Text>
@@ -506,7 +494,7 @@ export default function AdminOrders() {
 
                   {/* Status Action Buttons */}
                   {isThisUpdating ? (
-                    <ActivityIndicator size="small" color="#16A34A" />
+                    <ActivityIndicator size="small" color="#53B175" />
                   ) : (
                     <View className="flex-row gap-2">
                       {norm === 'order_placed' && (

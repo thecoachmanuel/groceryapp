@@ -183,7 +183,7 @@ export default function CustomerOrdersList() {
             onPress={() => { if (item?.$id) router.push(`/order/${item.$id}` as any) }}
             className="flex-1 bg-primary/5 rounded-2xl py-2.5 items-center border-2 border-primary/10"
           >
-            <Text className="text-primary font-quicksand-bold text-xs">Track Order →</Text>
+            <Text className="text-primary font-quicksand-bold text-xs" style={{ color: '#53B175' }}>Track Order →</Text>
           </TouchableOpacity>
 
           {!isPast && (
@@ -208,8 +208,8 @@ export default function CustomerOrdersList() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
-      <StatusBar barStyle="dark-content" backgroundColor="#E6F7EC" />
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Header */}
       <View className="px-5 pt-4 pb-3 flex-row justify-between items-center">
@@ -249,7 +249,7 @@ export default function CustomerOrdersList() {
 
       {loading ? (
         <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color="#16A34A" />
+          <ActivityIndicator size="large" color="#53B175" />
         </View>
       ) : (
         <FlatList
@@ -258,7 +258,7 @@ export default function CustomerOrdersList() {
           renderItem={renderOrder}
           contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16A34A" colors={['#16A34A']} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#53B175" colors={['#53B175']} />
           }
           ListEmptyComponent={() => (
             <View className="items-center mt-16 px-8">

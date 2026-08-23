@@ -3,7 +3,23 @@ import CustomButton from '@/components/CustomButton'
 import CustomHeader from '@/components/CustomHeader'
 import LocationPickerModal from '@/components/LocationPickerModal'
 import { PaystackPayment } from '@/components/PaystackPayment'
-import { createOrder, debitCustomerWallet, getCustomerWallet, getDeliveryFeeSettings, updateUserProfile, validateAndApplyCoupon } from '@/lib/appwrite'
+import {
+  calculateDynamicDeliveryFee,
+  calculateEstimatedDeliveryTime,
+  calculateHaversineDistanceKm,
+  createOrder,
+  debitCustomerWallet,
+  geocodeAddressCoords,
+  getCustomerWallet,
+  getDeliveryFeeSettings,
+  getStoreById,
+  getStores,
+  sortStoresByProximity,
+  recordWalletTransaction,
+  updateUserProfile,
+  validateAndApplyCoupon,
+  DeliveryFeeSettings,
+} from '@/lib/appwrite'
 import useAuthStore from '@/store/auth.store'
 import { useCartStore } from '@/store/cart.store'
 import { useLocationStore } from '@/store/location.store'
@@ -33,8 +49,8 @@ const PaymentInfoStripe = ({
 const Cart = () => {
   const router = useRouter()
   const { user, fetchAuthenticatedUser } = useAuthStore()
-  const { address, isCaptured, savedAddresses, selectSavedAddress } = useLocationStore()
-  const { items, getTotalItems, getTotalPrice, clearCart } = useCartStore()
+  const { address, latitude, longitude, isCaptured, savedAddresses, selectSavedAddress } = useLocationStore()
+  const { items, getTotalItems, getTotalPrice, clearCart, removeItem } = useCartStore()
 
   const [paymentModalVisible, setPaymentModalVisible] = useState(false)
   const [locationModalVisible, setLocationModalVisible] = useState(false)
@@ -49,8 +65,9 @@ const Cart = () => {
   const [couponLoading, setCouponLoading] = useState(false)
 
   // Dynamic Live Delivery Fee Settings
-  const [baseDeliveryFee, setBaseDeliveryFee] = useState(50)
-  const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState(0)
+  const [deliverySettings, setDeliverySettings] = useState<DeliveryFeeSettings | null>(null)
+  const [baseDeliveryFee, setBaseDeliveryFee] = useState(1000)
+  const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState(10000)
 
   const [paymentMethod, setPaymentMethod] = useState<'paystack' | 'wallet' | 'split'>('paystack')
   const [walletBalance, setWalletBalance] = useState(0)
@@ -70,6 +87,7 @@ const Cart = () => {
   useFocusEffect(
     React.useCallback(() => {
       getDeliveryFeeSettings().then((settings) => {
+        setDeliverySettings(settings)
         setBaseDeliveryFee(settings.deliveryFee)
         setFreeDeliveryThreshold(settings.freeDeliveryThreshold)
       })
@@ -82,13 +100,177 @@ const Cart = () => {
     }, [userId])
   )
 
+  const [userLocationCoords, setUserLocationCoords] = useState<{ latitude: number; longitude: number } | null>(null)
+  const [storeLocationCoords, setStoreLocationCoords] = useState<{ latitude: number; longitude: number } | null>(null)
+  const [storeLocationCoordsMap, setStoreLocationCoordsMap] = useState<Record<string, { latitude: number; longitude: number; storeName?: string }>>({})
+
+  // Resolve Customer Location Coordinates (Identical to Home Screen)
+  React.useEffect(() => {
+    let isMounted = true
+    const resolveUser = async () => {
+      if (latitude && longitude) {
+        console.log('[CART] User GPS coords (matching Home screen):', latitude, longitude)
+        if (isMounted) setUserLocationCoords({ latitude: Number(latitude), longitude: Number(longitude) })
+      } else if (address && address !== 'Detecting location...' && address.trim() !== '') {
+        console.log('[CART] Geocoding selected user address:', address)
+        const coords = await geocodeAddressCoords(address)
+        console.log('[CART] Geocoded user coords:', coords)
+        if (isMounted) setUserLocationCoords(coords)
+      } else {
+        console.log('[CART] No user location found, using Lagos default')
+        if (isMounted) setUserLocationCoords({ latitude: 6.5244, longitude: 3.3792 })
+      }
+    }
+    resolveUser()
+    return () => { isMounted = false }
+  }, [address, latitude, longitude])
+
+  // Resolve Store Location Coordinates for EVERY unique seller in cart
+  React.useEffect(() => {
+    let isMounted = true
+    const resolveStores = async () => {
+      if (items.length > 0) {
+        const uniqueSellerIds = Array.from(
+          new Set(
+            items.map((i: any) => i.sellerId || i.storeId || i.seller_id).filter(Boolean)
+          )
+        )
+
+        const mapAcc: Record<string, { latitude: number; longitude: number; storeName?: string }> = {}
+
+        try {
+          const allDbStores: any = await getStores().catch(() => [])
+
+          for (const sId of uniqueSellerIds) {
+            const strId = String(sId)
+            let st: any = allDbStores.find((store: any) => store.$id === strId || store.id === strId)
+            if (!st && typeof sId === 'string') {
+              st = await getStoreById(sId).catch(() => null)
+            }
+
+            if (st && st.latitude && st.longitude &&
+                Number(st.latitude) >= 4.0 && Number(st.latitude) <= 14.0 &&
+                Number(st.longitude) >= 2.0 && Number(st.longitude) <= 15.0) {
+              mapAcc[strId] = {
+                latitude: Number(st.latitude),
+                longitude: Number(st.longitude),
+                storeName: st.storeName || 'Store',
+              }
+            } else if (st && st.address) {
+              const coords = await geocodeAddressCoords(st.address)
+              mapAcc[strId] = {
+                latitude: coords.latitude,
+                longitude: coords.longitude,
+                storeName: st.storeName || 'Store',
+              }
+            }
+          }
+
+          if (Object.keys(mapAcc).length === 0 && allDbStores && allDbStores.length > 0) {
+            const sorted = sortStoresByProximity(allDbStores, latitude, longitude)
+            const fallbackStore = sorted[0]
+            if (fallbackStore) {
+              mapAcc['default'] = {
+                latitude: Number(fallbackStore.latitude || 6.5244),
+                longitude: Number(fallbackStore.longitude || 3.3792),
+                storeName: fallbackStore.storeName || 'Store',
+              }
+            }
+          }
+
+          if (isMounted) {
+            setStoreLocationCoordsMap(mapAcc)
+            const firstKey = Object.keys(mapAcc)[0]
+            if (firstKey) {
+              setStoreLocationCoords(mapAcc[firstKey])
+            }
+          }
+        } catch (e) {
+          console.log('[CART] Store evaluation error:', e)
+        }
+      }
+    }
+    resolveStores()
+    return () => { isMounted = false }
+  }, [items, latitude, longitude])
+
+  // Comprehensive Multi-Store Distance & Delivery Radius Evaluation
+  const multiStoreEvaluation = React.useMemo(() => {
+    const uLat = userLocationCoords?.latitude || latitude || 6.5244
+    const uLon = userLocationCoords?.longitude || longitude || 3.3792
+    const maxRadius = deliverySettings?.maxDeliveryRadiusKm || 20
+
+    const outOfRangeItemIds: Set<string> = new Set()
+    const outOfRangeStoreNames: Set<string> = new Set()
+    let maxDistKm = 0
+    let hasOutOfRangeStore = false
+
+    items.forEach((item: any) => {
+      const sId = String(item.sellerId || item.storeId || item.seller_id || 'default')
+      const storeCoords = storeLocationCoordsMap[sId] || storeLocationCoordsMap['default']
+
+      let distKm = 2.5
+      if (storeCoords && storeCoords.latitude && storeCoords.longitude) {
+        distKm = calculateHaversineDistanceKm(uLat, uLon, storeCoords.latitude, storeCoords.longitude)
+      }
+
+      if (distKm > maxDistKm) maxDistKm = distKm
+
+      if (distKm > maxRadius) {
+        hasOutOfRangeStore = true
+        if (storeCoords?.storeName) outOfRangeStoreNames.add(storeCoords.storeName)
+        if (item.id) outOfRangeItemIds.add(item.id)
+      }
+    })
+
+    return {
+      hasOutOfRangeStore,
+      outOfRangeItemIds,
+      outOfRangeStoreNames: Array.from(outOfRangeStoreNames),
+      maxDistKm,
+    }
+  }, [items, storeLocationCoordsMap, userLocationCoords, latitude, longitude, deliverySettings])
+
   const totalPrice = getTotalPrice()
-  const isFreeDelivery = freeDeliveryThreshold > 0 && totalPrice >= freeDeliveryThreshold
-  const actualDeliveryFee = isFreeDelivery ? 0 : baseDeliveryFee
+  const totalItems = getTotalItems()
+
+  // Calculate dynamic incremental delivery fee based on total products ordered, distance & subtotal
+  const rawDeliveryCalc = deliverySettings
+    ? calculateDynamicDeliveryFee(totalItems, totalPrice, deliverySettings, {
+        userLocation: userLocationCoords || undefined,
+        storeLocation: storeLocationCoords || undefined,
+      })
+    : {
+        baseFee: baseDeliveryFee,
+        incrementalFee: 0,
+        totalDeliveryFee: freeDeliveryThreshold > 0 && totalPrice >= freeDeliveryThreshold ? 0 : baseDeliveryFee,
+        isFree: freeDeliveryThreshold > 0 && totalPrice >= freeDeliveryThreshold,
+        distanceKm: 2.5,
+        isOutOfRange: false,
+        breakdownText: `Base ₦${baseDeliveryFee.toLocaleString()}`,
+      }
+
+  const deliveryCalc = {
+    ...rawDeliveryCalc,
+    isOutOfRange: multiStoreEvaluation.hasOutOfRangeStore || rawDeliveryCalc.isOutOfRange,
+    distanceKm: multiStoreEvaluation.maxDistKm > 0 ? multiStoreEvaluation.maxDistKm : rawDeliveryCalc.distanceKm,
+  }
+
+  const actualDeliveryFee = deliveryCalc.totalDeliveryFee
+  const isFreeDelivery = deliveryCalc.isFree
   const amountNeededForFreeDelivery = Math.max(0, freeDeliveryThreshold - totalPrice)
 
-  const totalItems = getTotalItems()
   const netTotal = Math.max(0, totalPrice + actualDeliveryFee - couponDiscount)
+
+  const handleRemoveOutOfRangeItems = () => {
+    if (multiStoreEvaluation.outOfRangeItemIds.size === 0) return
+    const idsToRemove = Array.from(multiStoreEvaluation.outOfRangeItemIds)
+    idsToRemove.forEach((id) => removeItem(id))
+    Alert.alert(
+      'Out-of-Range Items Removed 🛒',
+      `Removed ${idsToRemove.length} out-of-range item(s) from your cart. Valid items remain in your cart!`
+    )
+  }
 
   const handleApplyCoupon = async () => {
     if (!couponCodeInput.trim()) {
@@ -135,6 +317,18 @@ const Cart = () => {
             text: 'Open Map Picker',
             onPress: () => setLocationModalVisible(true),
           },
+        ]
+      )
+      return
+    }
+
+    if (deliveryCalc.isOutOfRange) {
+      Alert.alert(
+        'Delivery Out of Range ⚠️',
+        `The store is ${deliveryCalc.distanceKm} km away from your selected delivery address, which exceeds the maximum delivery radius of ${deliverySettings?.maxDeliveryRadiusKm || 20} km.\n\nPlease select a closer delivery address or choose products from a nearby store.`,
+        [
+          { text: 'Change Delivery Address', onPress: () => setLocationModalVisible(true) },
+          { text: 'OK', style: 'cancel' },
         ]
       )
       return
@@ -196,19 +390,56 @@ const Cart = () => {
         await fetchAuthenticatedUser()
       }
 
-      // Handle wallet deductions
+      // Handle payment method transaction recording & deductions
       if (paymentMethod === 'wallet') {
         if (walletBalance < netTotal) {
           setIsProcessing(false)
           return Alert.alert('Insufficient Wallet Funds', `Wallet balance (₦${walletBalance}) is less than order total (₦${netTotal.toFixed(2)}). Choose Split Pay or Paystack.`)
         }
-        await debitCustomerWallet(userId, netTotal, 'order_payment', `Order checkout #${Date.now().toString().slice(-6)}`, paymentRef)
+        await debitCustomerWallet(
+          userId,
+          netTotal,
+          'wallet_order_payment',
+          `Full Wallet Order Checkout — ₦${netTotal.toLocaleString()}`,
+          paymentRef,
+        )
       } else if (paymentMethod === 'split') {
         const walletPortion = Math.min(walletBalance, netTotal)
+        const paystackPortion = Math.max(0, netTotal - walletBalance)
+
         if (walletPortion > 0) {
-          await debitCustomerWallet(userId, walletPortion, 'order_payment', `Split checkout — wallet portion`, `${paymentRef}_W`)
+          await debitCustomerWallet(
+            userId,
+            walletPortion,
+            'split_wallet_payment',
+            `Split Checkout (Wallet Portion) — ₦${walletPortion.toLocaleString()}`,
+            `${paymentRef}_W`,
+          )
         }
+
+        if (paystackPortion > 0) {
+          await recordWalletTransaction({
+            userId,
+            amount: paystackPortion,
+            type: 'debit',
+            category: 'split_paystack_payment',
+            description: `Split Checkout (Paystack Card Portion) — ₦${paystackPortion.toLocaleString()}`,
+            reference: `${paymentRef}_P`,
+          })
+        }
+      } else if (paymentMethod === 'paystack') {
+        await recordWalletTransaction({
+          userId,
+          amount: netTotal,
+          type: 'debit',
+          category: 'paystack_card_payment',
+          description: `Card Checkout via Paystack — ₦${netTotal.toLocaleString()}`,
+          reference: paymentRef,
+        })
       }
+
+      const firstItem = items[0]
+      const sellerId = (firstItem as any)?.sellerId || (firstItem as any)?.storeId || (firstItem as any)?.seller_id
 
       const order = await createOrder({
         userId: userId || 'guest_user',
@@ -219,7 +450,14 @@ const Cart = () => {
         deliveryAddress: address || 'Current Location',
         paymentReference: paymentRef,
         paymentStatus: 'paid',
+        sellerId: sellerId || undefined,
         orderNotes: orderNotes.trim(),
+        storeLatitude: storeLocationCoords?.latitude,
+        storeLongitude: storeLocationCoords?.longitude,
+        customerLatitude: userLocationCoords?.latitude,
+        customerLongitude: userLocationCoords?.longitude,
+        deliveryDistanceKm: deliveryCalc.distanceKm,
+        deliveryFee: actualDeliveryFee,
       })
 
       clearCart()
@@ -256,7 +494,7 @@ const Cart = () => {
 
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
       <FlatList
         data={items}
         renderItem={({ item }) => <CartItem item={item} />}
@@ -376,6 +614,45 @@ const Cart = () => {
                 </View>
               )}
 
+              {/* Interactive Out-of-Range Resolution Banner */}
+              {deliveryCalc.isOutOfRange && (
+                <View className="bg-red-500/10 border-2 border-red-500/30 rounded-[28px] p-5 mb-5 shadow-sm">
+                  <View className="flex-row items-center mb-2">
+                    <Text className="text-2xl mr-3">⚠️</Text>
+                    <View className="flex-1">
+                      <Text className="text-red-800 font-quicksand-bold text-sm">
+                        Items Out of Delivery Radius
+                      </Text>
+                      <Text className="text-red-700 font-quicksand-medium text-xs mt-0.5">
+                        Store is {deliveryCalc.distanceKm} km away (Max radius: {deliverySettings?.maxDeliveryRadiusKm || 20} km).
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View className="flex-row items-center gap-x-3 mt-3">
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={handleRemoveOutOfRangeItems}
+                      className="flex-1 bg-red-600 py-3 px-3 rounded-2xl items-center justify-center shadow-sm active:scale-95"
+                    >
+                      <Text className="text-white font-quicksand-bold text-xs">
+                        🗑️ Remove Out-of-Range Items
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={() => setLocationModalVisible(true)}
+                      className="bg-white border border-red-500/40 px-3.5 py-3 rounded-2xl items-center justify-center active:scale-95"
+                    >
+                      <Text className="text-red-700 font-quicksand-bold text-xs">
+                        📍 Change Address
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
               {/* Payment Summary */}
               <View className="bg-white rounded-[30px] p-6 border-2 border-primary/10 shadow-lg shadow-black/10">
                 <Text className="text-dark-100 text-xl font-quicksand-bold mb-5">
@@ -387,10 +664,37 @@ const Cart = () => {
                   value={`₦ ${totalPrice.toFixed(2)}`}
                 />
                 <PaymentInfoStripe
-                  label="Delivery Fee"
-                  value={actualDeliveryFee === 0 ? 'FREE 🎉' : `₦ ${actualDeliveryFee.toFixed(2)}`}
-                  valueStyle={actualDeliveryFee === 0 ? '!text-green-600 font-quicksand-bold' : undefined}
+                  label={`Delivery Fee ${deliverySettings?.deliveryPricingMode === 'distance' && deliveryCalc.distanceKm ? `(📍 ${deliveryCalc.distanceKm} km)` : ''}`}
+                  value={
+                    deliveryCalc.isOutOfRange
+                      ? '⚠️ Out of Range'
+                      : (actualDeliveryFee === 0 ? 'FREE 🎉' : `₦ ${actualDeliveryFee.toFixed(2)}`)
+                  }
+                  valueStyle={
+                    deliveryCalc.isOutOfRange
+                      ? '!text-red-500 font-quicksand-bold text-xs'
+                      : (actualDeliveryFee === 0 ? '!text-green-600 font-quicksand-bold' : undefined)
+                  }
                 />
+                <PaymentInfoStripe
+                  label="Estimated Delivery Time"
+                  value={
+                    deliveryCalc.isOutOfRange
+                      ? 'Out of Radius'
+                      : `⚡ ${calculateEstimatedDeliveryTime(deliveryCalc.distanceKm).label}`
+                  }
+                  valueStyle="!text-primary font-quicksand-bold text-xs"
+                />
+                {deliveryCalc.isOutOfRange && (
+                  <View className="bg-red-500/10 border border-red-500/30 p-3 rounded-2xl my-2">
+                    <Text className="text-red-700 font-quicksand-bold text-xs">
+                      ⚠️ Delivery Address Out of Range
+                    </Text>
+                    <Text className="text-red-600 font-quicksand-medium text-[11px] mt-0.5">
+                      Store is {deliveryCalc.distanceKm} km away. Maximum delivery radius is {deliverySettings?.maxDeliveryRadiusKm || 20} km. Please select a closer delivery address.
+                    </Text>
+                  </View>
+                )}
                 {couponDiscount > 0 && (
                   <PaymentInfoStripe
                     label="Promo Discount"
@@ -485,8 +789,8 @@ const Cart = () => {
                     onPress={() => setPaymentMethod('paystack')}
                     className="p-4 rounded-2xl border-2 flex-row justify-between items-center"
                     style={{
-                      backgroundColor: paymentMethod === 'paystack' ? 'rgba(22, 163, 74, 0.05)' : 'rgba(249, 250, 251, 0.8)',
-                      borderColor: paymentMethod === 'paystack' ? '#16A34A' : 'rgba(229, 231, 235, 0.8)',
+                      backgroundColor: paymentMethod === 'paystack' ? 'rgba(83, 177, 117, 0.05)' : 'rgba(249, 250, 251, 0.8)',
+                      borderColor: paymentMethod === 'paystack' ? '#53B175' : 'rgba(229, 231, 235, 0.8)',
                     }}
                   >
                     <View className="flex-row items-center flex-1 mr-3">
@@ -505,8 +809,8 @@ const Cart = () => {
                     <View
                       className="w-6 h-6 rounded-full border-2 items-center justify-center"
                       style={{
-                        borderColor: paymentMethod === 'paystack' ? '#16A34A' : '#D1D5DB',
-                        backgroundColor: paymentMethod === 'paystack' ? '#16A34A' : '#FFFFFF',
+                        borderColor: paymentMethod === 'paystack' ? '#53B175' : '#D1D5DB',
+                        backgroundColor: paymentMethod === 'paystack' ? '#53B175' : '#FFFFFF',
                       }}
                     >
                       {paymentMethod === 'paystack' && <View className="w-2.5 h-2.5 bg-white rounded-full" />}
@@ -519,8 +823,8 @@ const Cart = () => {
                     onPress={() => setPaymentMethod('wallet')}
                     className="p-4 rounded-2xl border-2 flex-row justify-between items-center"
                     style={{
-                      backgroundColor: paymentMethod === 'wallet' ? 'rgba(22, 163, 74, 0.05)' : 'rgba(249, 250, 251, 0.8)',
-                      borderColor: paymentMethod === 'wallet' ? '#16A34A' : 'rgba(229, 231, 235, 0.8)',
+                      backgroundColor: paymentMethod === 'wallet' ? 'rgba(83, 177, 117, 0.05)' : 'rgba(249, 250, 251, 0.8)',
+                      borderColor: paymentMethod === 'wallet' ? '#53B175' : 'rgba(229, 231, 235, 0.8)',
                     }}
                   >
                     <View className="flex-row items-center flex-1 mr-3">
@@ -534,7 +838,7 @@ const Cart = () => {
                         <Text
                           className="font-quicksand-semibold text-xs mt-0.5"
                           style={{
-                            color: walletBalance >= netTotal ? '#16a34a' : '#d97706',
+                            color: walletBalance >= netTotal ? '#53B175' : '#d97706',
                           }}
                         >
                           {walletBalance >= netTotal ? '1-Click Instant Payment' : 'Insufficient balance for full total'}
@@ -544,8 +848,8 @@ const Cart = () => {
                     <View
                       className="w-6 h-6 rounded-full border-2 items-center justify-center"
                       style={{
-                        borderColor: paymentMethod === 'wallet' ? '#16A34A' : '#D1D5DB',
-                        backgroundColor: paymentMethod === 'wallet' ? '#16A34A' : '#FFFFFF',
+                        borderColor: paymentMethod === 'wallet' ? '#53B175' : '#D1D5DB',
+                        backgroundColor: paymentMethod === 'wallet' ? '#53B175' : '#FFFFFF',
                       }}
                     >
                       {paymentMethod === 'wallet' && <View className="w-2.5 h-2.5 bg-white rounded-full" />}
@@ -559,8 +863,8 @@ const Cart = () => {
                       onPress={() => setPaymentMethod('split')}
                       className="p-4 rounded-2xl border-2 flex-row justify-between items-center"
                       style={{
-                        backgroundColor: paymentMethod === 'split' ? 'rgba(22, 163, 74, 0.05)' : 'rgba(249, 250, 251, 0.8)',
-                        borderColor: paymentMethod === 'split' ? '#16A34A' : 'rgba(229, 231, 235, 0.8)',
+                        backgroundColor: paymentMethod === 'split' ? 'rgba(83, 177, 117, 0.05)' : 'rgba(249, 250, 251, 0.8)',
+                        borderColor: paymentMethod === 'split' ? '#53B175' : 'rgba(229, 231, 235, 0.8)',
                       }}
                     >
                       <View className="flex-row items-center flex-1 mr-3">
@@ -579,8 +883,8 @@ const Cart = () => {
                       <View
                         className="w-6 h-6 rounded-full border-2 items-center justify-center"
                         style={{
-                          borderColor: paymentMethod === 'split' ? '#16A34A' : '#D1D5DB',
-                          backgroundColor: paymentMethod === 'split' ? '#16A34A' : '#FFFFFF',
+                          borderColor: paymentMethod === 'split' ? '#53B175' : '#D1D5DB',
+                          backgroundColor: paymentMethod === 'split' ? '#53B175' : '#FFFFFF',
                         }}
                       >
                         {paymentMethod === 'split' && <View className="w-2.5 h-2.5 bg-white rounded-full" />}
@@ -662,7 +966,7 @@ const Cart = () => {
 
               {isProcessing ? (
                 <View className="py-4 items-center">
-                  <ActivityIndicator size="large" color="#16A34A" />
+                  <ActivityIndicator size="large" color="#53B175" />
                   <Text className="text-primary font-quicksand-semibold mt-2">
                     Processing Checkout Transaction...
                   </Text>

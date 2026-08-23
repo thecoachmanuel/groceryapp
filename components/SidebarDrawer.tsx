@@ -95,7 +95,7 @@ export default function SidebarDrawer({ visible, onClose, type }: SidebarDrawerP
             borderTopRightRadius: 36,
             borderBottomRightRadius: 36,
             borderRightWidth: 2,
-            borderColor: 'rgba(22, 163, 74, 0.2)',
+            borderColor: 'rgba(83, 177, 117, 0.2)',
             shadowColor: '#000',
             shadowOpacity: 0.25,
             shadowOffset: { width: 4, height: 0 },
@@ -121,10 +121,14 @@ export default function SidebarDrawer({ visible, onClose, type }: SidebarDrawerP
               </View>
 
               <View className="flex-row items-center">
-                <Image
-                  source={{ uri: (user as any)?.avatar || `https://cloud.appwrite.io/v1/avatars/initials?name=${encodeURIComponent(user?.name || 'User')}` }}
-                  className="w-12 h-12 rounded-full border-2 border-primary/30 mr-3 bg-white"
-                />
+                <View className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary/30 mr-3 bg-white items-center justify-center">
+                  <Image
+                    source={{ uri: (user as any)?.avatar || `https://cloud.appwrite.io/v1/avatars/initials?name=${encodeURIComponent(user?.name || 'User')}` }}
+                    className="w-full h-full"
+                    style={{ width: '100%', height: '100%', borderRadius: 9999 }}
+                    resizeMode="cover"
+                  />
+                </View>
                 <View className="flex-1">
                   <Text className="font-quicksand-bold text-dark-100 text-base" numberOfLines={1}>
                     {type === 'seller' ? storeName : user?.name || 'Admin'}
@@ -157,9 +161,9 @@ export default function SidebarDrawer({ visible, onClose, type }: SidebarDrawerP
                       activeOpacity={0.8}
                       onPress={() => navigateTo(item.path)}
                       style={{
-                        backgroundColor: isActive ? 'rgba(22, 163, 74, 0.08)' : '#FFFFFF',
+                        backgroundColor: isActive ? 'rgba(83, 177, 117, 0.08)' : '#FFFFFF',
                         borderWidth: 2,
-                        borderColor: isActive ? '#16A34A' : 'rgba(22, 163, 74, 0.1)',
+                        borderColor: isActive ? '#53B175' : 'rgba(83, 177, 117, 0.1)',
                         borderRadius: 20,
                         padding: 14,
                         flexDirection: 'row',
@@ -177,7 +181,7 @@ export default function SidebarDrawer({ visible, onClose, type }: SidebarDrawerP
                           width: 36,
                           height: 36,
                           borderRadius: 12,
-                          backgroundColor: isActive ? '#16A34A' : 'rgba(22, 163, 74, 0.1)',
+                          backgroundColor: isActive ? '#53B175' : 'rgba(83, 177, 117, 0.1)',
                           alignItems: 'center',
                           justifyContent: 'center',
                           marginRight: 12,
@@ -188,7 +192,7 @@ export default function SidebarDrawer({ visible, onClose, type }: SidebarDrawerP
                           <Text style={{
                             fontFamily: 'Quicksand-Bold',
                             fontSize: 13,
-                            color: isActive ? '#16A34A' : '#1A1A2E',
+                            color: isActive ? '#53B175' : '#1A1A2E',
                           }}>
                             {item.label}
                           </Text>
@@ -205,7 +209,7 @@ export default function SidebarDrawer({ visible, onClose, type }: SidebarDrawerP
                       <Text style={{
                         fontFamily: 'Quicksand-Bold',
                         fontSize: 14,
-                        color: isActive ? '#16A34A' : '#D1D5DB',
+                        color: isActive ? '#53B175' : '#D1D5DB',
                       }}>
                         →
                       </Text>
@@ -228,9 +232,9 @@ export default function SidebarDrawer({ visible, onClose, type }: SidebarDrawerP
                 activeOpacity={0.8}
                 onPress={() => navigateTo('/(tabs)')}
                 style={{
-                  backgroundColor: 'rgba(22, 163, 74, 0.05)',
+                  backgroundColor: 'rgba(83, 177, 117, 0.05)',
                   borderWidth: 2,
-                  borderColor: 'rgba(22, 163, 74, 0.2)',
+                  borderColor: 'rgba(83, 177, 117, 0.2)',
                   borderRadius: 20,
                   padding: 14,
                   flexDirection: 'row',
@@ -242,7 +246,7 @@ export default function SidebarDrawer({ visible, onClose, type }: SidebarDrawerP
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Text style={{ fontSize: 20, marginRight: 10 }}>🛒</Text>
                   <View>
-                    <Text style={{ fontFamily: 'Quicksand-Bold', fontSize: 13, color: '#16A34A' }}>
+                    <Text style={{ fontFamily: 'Quicksand-Bold', fontSize: 13, color: '#53B175' }}>
                       Customer App Mode
                     </Text>
                     <Text style={{ fontFamily: 'Quicksand-Medium', fontSize: 10, color: '#6B7280' }}>
@@ -250,7 +254,7 @@ export default function SidebarDrawer({ visible, onClose, type }: SidebarDrawerP
                     </Text>
                   </View>
                 </View>
-                <Text style={{ color: '#16A34A', fontWeight: 'bold' }}>→</Text>
+                <Text style={{ color: '#53B175', fontWeight: 'bold' }}>→</Text>
               </TouchableOpacity>
 
               {/* Logout Button */}

@@ -156,15 +156,15 @@ export default function OrderTracking() {
   // -------------------------------------------------------------------
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-bg-light justify-center items-center">
-        <ActivityIndicator size="large" color="#16A34A" />
+      <SafeAreaView className="flex-1 bg-white justify-center items-center" style={{ backgroundColor: '#ffffff' }}>
+        <ActivityIndicator size="large" color="#53B175" />
       </SafeAreaView>
     )
   }
 
   if (!order) {
     return (
-      <SafeAreaView className="flex-1 bg-bg-light justify-center items-center px-6">
+      <SafeAreaView className="flex-1 bg-white justify-center items-center px-6" style={{ backgroundColor: '#ffffff' }}>
         <Text className="text-xl font-quicksand-bold text-dark-100 mb-4">Order Not Found</Text>
         <TouchableOpacity
           onPress={() => router.replace('/(tabs)' as any)}
@@ -189,7 +189,7 @@ export default function OrderTracking() {
   const canCustomerCancel = !isAdmin && !isSeller && normStatus === 'order_placed'
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 80 }}>
 
         {/* ── Header ── */}
@@ -412,7 +412,7 @@ export default function OrderTracking() {
 
             {actionLoading && (
               <View className="mt-4 items-center">
-                <ActivityIndicator color="#16A34A" />
+                <ActivityIndicator color="#53B175" />
               </View>
             )}
           </View>

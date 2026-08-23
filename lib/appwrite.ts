@@ -11,11 +11,11 @@ import {
 } from 'react-native-appwrite'
 
 export const appwriteConfig = {
-  endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!,
-  projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!,
+  endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1',
+  projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID || '6a87786a0006db9d111d',
   platform: 'com.grocery.app',
-  databaseId: '6a877af5000bdb5165ac',
-  bucketId: '6a87822a000b821c4393',
+  databaseId: process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID || '6a877af5000bdb5165ac',
+  bucketId: process.env.EXPO_PUBLIC_APPWRITE_BUCKET_ID || '6a87822a000b821c4393',
   userCollectionId: 'user',
   categoriesCollectionId: 'categories',
   menuCollectionId: 'products',
@@ -51,8 +51,14 @@ export const createUser = async ({
   role = 'customer',
 }: CreateUserParams) => {
   try {
+    try {
+      await account.deleteSession('current')
+    } catch {
+      // Ignore if no active session
+    }
+
     const newAccount = await account.create(ID.unique(), email, password, name)
-    if (!newAccount) throw Error
+    if (!newAccount) throw new Error('Account creation failed')
 
     await signIn({ email, password })
 
@@ -64,17 +70,24 @@ export const createUser = async ({
       ID.unique(),
       { email, name, accountId: newAccount.$id, avatar: avatarUrl, role },
     )
-  } catch (e) {
-    throw new Error(e as string)
+  } catch (e: any) {
+    throw new Error(e.message || String(e))
   }
 }
 
 export const signIn = async ({ email, password }: SignInParams) => {
   try {
+    // Delete any active session first to avoid "creation of a session is prohibited when a session is active"
+    try {
+      await account.deleteSession('current')
+    } catch {
+      // Ignore if no active session
+    }
+
     const session = await account.createEmailPasswordSession(email, password)
     return session
-  } catch (e) {
-    throw new Error(e as string)
+  } catch (e: any) {
+    throw new Error(e.message || String(e))
   }
 }
 
@@ -183,11 +196,11 @@ export const getBanners = async () => {
       [Query.orderAsc('displayOrder'), Query.limit(50)],
     )
 
+    // Deduplicate strictly by document $id so admin edits persist cleanly without title collisions
     const uniqueMap = new Map<string, any>()
     for (const doc of response.documents || []) {
-      const key = (doc.title || doc.$id || '').trim().toLowerCase()
-      if (!uniqueMap.has(key)) {
-        uniqueMap.set(key, doc)
+      if (doc?.$id) {
+        uniqueMap.set(doc.$id, doc)
       }
     }
     return Array.from(uniqueMap.values())
@@ -362,6 +375,20 @@ export const uploadImageToStorage = async (fileUri: string, prefix = 'prod') => 
   }
 }
 
+export const deleteStorageFileByUrl = async (fileUrl?: string) => {
+  if (!fileUrl || typeof fileUrl !== 'string') return
+  if (!fileUrl.includes('/files/')) return
+  try {
+    const match = fileUrl.match(/\/files\/([a-zA-Z0-9_-]+)/)
+    if (match && match[1]) {
+      const fileId = match[1]
+      await storage.deleteFile(appwriteConfig.bucketId, fileId).catch(() => { })
+    }
+  } catch (err) {
+    console.warn('deleteStorageFileByUrl error:', err)
+  }
+}
+
 // ----------------------------------------------------
 // 🏪 STORES & SELLER MANAGEMENT
 // ----------------------------------------------------
@@ -437,6 +464,357 @@ export const getStores = async () => {
   }
 }
 
+export const DEFAULT_STORES = [
+  {
+    $id: 'store_1',
+    id: 'store_1',
+    storeName: 'Green Valley Organic Market',
+    description: 'Farm-fresh organic fruits, vegetables & healthy daily picks',
+    rating: 4.9,
+    deliveryTime: '15-25 min',
+    status: 'active',
+    phone: '+234 802 345 6789',
+    address: '14 Admiralty Way, Lekki Phase 1, Lagos',
+    latitude: 6.4698,
+    longitude: 3.5852,
+    logoUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&auto=format&fit=crop&q=80',
+    bannerUrl: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=1200&auto=format&fit=crop&q=80',
+  },
+  {
+    $id: 'store_2',
+    id: 'store_2',
+    storeName: 'Daily Supermarket & Bakery',
+    description: 'Artisanal breads, fresh dairy, eggs, pantry & bakery items',
+    rating: 4.8,
+    deliveryTime: '20-30 min',
+    status: 'active',
+    phone: '+234 803 456 7890',
+    address: '22 Victoria Island Boulevard, Lagos',
+    latitude: 6.4281,
+    longitude: 3.4219,
+    logoUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&auto=format&fit=crop&q=80',
+    bannerUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=1200&auto=format&fit=crop&q=80',
+  },
+  {
+    $id: 'store_3',
+    id: 'store_3',
+    storeName: 'Oceanic Seafood & Meat Corner',
+    description: 'Fresh cuts of lean meat, poultry, fish & ocean catch',
+    rating: 4.9,
+    deliveryTime: '25-35 min',
+    status: 'active',
+    phone: '+234 805 678 9012',
+    address: '5 Awolowo Road, Ikoyi, Lagos',
+    latitude: 6.4549,
+    longitude: 3.4347,
+    logoUrl: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=400&auto=format&fit=crop&q=80',
+    bannerUrl: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=1200&auto=format&fit=crop&q=80',
+  },
+  {
+    $id: 'store_4',
+    id: 'store_4',
+    storeName: 'Sweet Treats & Snack Hub',
+    description: 'Beverages, chocolates, ice creams, chips & party snacks',
+    rating: 4.7,
+    deliveryTime: '15-20 min',
+    status: 'active',
+    phone: '+234 809 123 4567',
+    address: '8 Allen Avenue, Ikeja, Lagos',
+    latitude: 6.6018,
+    longitude: 3.3515,
+    logoUrl: 'https://images.unsplash.com/photo-1579954115545-a95591f28bfc?w=400&auto=format&fit=crop&q=80',
+    bannerUrl: 'https://images.unsplash.com/photo-1579954115545-a95591f28bfc?w=1200&auto=format&fit=crop&q=80',
+  },
+]
+
+export const DEFAULT_STORE_PRODUCTS: Record<string, any[]> = {
+  store_1: [
+    {
+      $id: 'mock_gro_1',
+      id: 'mock_gro_1',
+      name: 'Fresh Hass Avocados (3 Pcs)',
+      price: 2500,
+      discountPrice: 2200,
+      rating: 4.9,
+      categories: 'Fruits & Vegetables',
+      categoryId: 'Fruits & Vegetables',
+      sellerId: 'store_1',
+      image_url: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=800&auto=format&fit=crop&q=80',
+      description: 'Creamy, ripe organic Hass avocados imported fresh. Rich in healthy fats and potassium.',
+    },
+    {
+      $id: 'mock_gro_2',
+      id: 'mock_gro_2',
+      name: 'Organic Red Tomatoes (1kg)',
+      price: 1800,
+      discountPrice: 1500,
+      rating: 4.8,
+      categories: 'Fruits & Vegetables',
+      categoryId: 'Fruits & Vegetables',
+      sellerId: 'store_1',
+      image_url: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=800&auto=format&fit=crop&q=80',
+      description: 'Plump, vine-ripened red tomatoes ideal for salads, stews, and fresh cooking.',
+    },
+    {
+      $id: 'mock_gro_3',
+      id: 'mock_gro_3',
+      name: 'Fresh Organic Spinach & Kale Mix (400g)',
+      price: 1600,
+      discountPrice: 1400,
+      rating: 4.9,
+      categories: 'Fruits & Vegetables',
+      categoryId: 'Fruits & Vegetables',
+      sellerId: 'store_1',
+      image_url: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=800&auto=format&fit=crop&q=80',
+      description: 'Crisp, washed organic leafy greens packed with vitamins A, C, and iron.',
+    },
+    {
+      $id: 'mock_gro_4',
+      id: 'mock_gro_4',
+      name: 'Freshly Squeezed Orange Juice (1L)',
+      price: 2000,
+      discountPrice: 1800,
+      rating: 4.8,
+      categories: 'Beverages & Drinks',
+      categoryId: 'Beverages & Drinks',
+      sellerId: 'store_1',
+      image_url: 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=800&auto=format&fit=crop&q=80',
+      description: '100% natural Valencia orange juice with pulp. No added sugar or preservatives.',
+    },
+    {
+      $id: 'mock_gro_14',
+      id: 'mock_gro_14',
+      name: 'Frozen Mixed Berries (500g)',
+      price: 4000,
+      discountPrice: 3600,
+      rating: 4.8,
+      categories: 'Fruits & Vegetables',
+      categoryId: 'Fruits & Vegetables',
+      sellerId: 'store_1',
+      image_url: 'https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?w=800&auto=format&fit=crop&q=80',
+      description: 'Flash-frozen strawberries, blueberries, and raspberries. Great for smoothies.',
+    },
+  ],
+  store_2: [
+    {
+      $id: 'mock_gro_5',
+      id: 'mock_gro_5',
+      name: 'Whole Fresh Milk (1 Litre)',
+      price: 1200,
+      discountPrice: 1000,
+      rating: 4.7,
+      categories: 'Dairy & Eggs',
+      categoryId: 'Dairy & Eggs',
+      sellerId: 'store_2',
+      image_url: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=800&auto=format&fit=crop&q=80',
+      description: 'Pure, pasteurized whole cow milk rich in calcium and vitamin D.',
+    },
+    {
+      $id: 'mock_gro_6',
+      id: 'mock_gro_6',
+      name: 'Farm Fresh Grade A Eggs (Crate of 30)',
+      price: 4500,
+      discountPrice: 4200,
+      rating: 4.9,
+      categories: 'Dairy & Eggs',
+      categoryId: 'Dairy & Eggs',
+      sellerId: 'store_2',
+      image_url: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=800&auto=format&fit=crop&q=80',
+      description: 'Nutritious brown eggs harvested daily from free-range chicken farms.',
+    },
+    {
+      $id: 'mock_gro_7',
+      id: 'mock_gro_7',
+      name: 'Whole Wheat Sliced Bread (700g)',
+      price: 1500,
+      discountPrice: 1350,
+      rating: 4.8,
+      categories: 'Bakery & Bread',
+      categoryId: 'Bakery & Bread',
+      sellerId: 'store_2',
+      image_url: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80',
+      description: 'Freshly baked 100% whole grain wheat bread, soft and high in natural fiber.',
+    },
+    {
+      $id: 'mock_gro_8',
+      id: 'mock_gro_8',
+      name: 'Artisanal Butter Croissants (Pack of 4)',
+      price: 2800,
+      discountPrice: 2500,
+      rating: 4.9,
+      categories: 'Bakery & Bread',
+      categoryId: 'Bakery & Bread',
+      sellerId: 'store_2',
+      image_url: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80',
+      description: 'Flaky, buttery French-style breakfast pastries freshly baked each morning.',
+    },
+    {
+      $id: 'mock_gro_15',
+      id: 'mock_gro_15',
+      name: 'Cold Pressed Extra Virgin Olive Oil (750ml)',
+      price: 6500,
+      discountPrice: 6000,
+      rating: 4.9,
+      categories: 'Pantry & Grains',
+      categoryId: 'Pantry & Grains',
+      sellerId: 'store_2',
+      image_url: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=800&auto=format&fit=crop&q=80',
+      description: 'Premium cold-pressed extra virgin olive oil ideal for cooking and salad dressings.',
+    },
+  ],
+  store_3: [
+    {
+      $id: 'mock_gro_9',
+      id: 'mock_gro_9',
+      name: 'Fresh Chicken Breast Fillets (1kg)',
+      price: 5800,
+      discountPrice: 5200,
+      rating: 4.9,
+      categories: 'Meat & Seafood',
+      categoryId: 'Meat & Seafood',
+      sellerId: 'store_3',
+      image_url: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=800&auto=format&fit=crop&q=80',
+      description: 'Lean, skinless and boneless fresh chicken breast cuts packed with high protein.',
+    },
+    {
+      $id: 'mock_gro_10',
+      id: 'mock_gro_10',
+      name: 'Fresh Atlantic Salmon Fillet (500g)',
+      price: 8500,
+      discountPrice: 7800,
+      rating: 5.0,
+      categories: 'Meat & Seafood',
+      categoryId: 'Meat & Seafood',
+      sellerId: 'store_3',
+      image_url: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=800&auto=format&fit=crop&q=80',
+      description: 'Rich in Omega-3 fatty acids. Skin-on, boneless sushi-grade fresh salmon cut.',
+    },
+    {
+      $id: 'mock_gro_11',
+      id: 'mock_gro_11',
+      name: 'Premium Angus Beef Steak (800g)',
+      price: 9500,
+      discountPrice: 8900,
+      rating: 4.9,
+      categories: 'Meat & Seafood',
+      categoryId: 'Meat & Seafood',
+      sellerId: 'store_3',
+      image_url: 'https://images.unsplash.com/photo-1603048588665-791ca8aea617?w=800&auto=format&fit=crop&q=80',
+      description: 'Tender, marbled premium beef cut seasoned for pan searing or grilling.',
+    },
+    {
+      $id: 'mock_gro_12',
+      id: 'mock_gro_12',
+      name: 'Jumbo Tiger Prawns (1kg)',
+      price: 11000,
+      discountPrice: 9900,
+      rating: 4.8,
+      categories: 'Meat & Seafood',
+      categoryId: 'Meat & Seafood',
+      sellerId: 'store_3',
+      image_url: 'https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?w=800&auto=format&fit=crop&q=80',
+      description: 'Wild-caught large ocean prawns cleaned and ready for stir-fries and barbecue.',
+    },
+  ],
+  store_4: [
+    {
+      $id: 'mock_gro_13',
+      id: 'mock_gro_13',
+      name: 'Roasted Salted Cashew Nuts (250g)',
+      price: 3200,
+      discountPrice: 2900,
+      rating: 4.7,
+      categories: 'Snacks & Sweets',
+      categoryId: 'Snacks & Sweets',
+      sellerId: 'store_4',
+      image_url: 'https://images.unsplash.com/photo-1536591375315-1b836815d230?w=800&auto=format&fit=crop&q=80',
+      description: 'Crunchy jumbo cashew nuts slow-roasted and lightly salted to perfection.',
+    },
+    {
+      $id: 'mock_gro_16',
+      id: 'mock_gro_16',
+      name: 'Freshly Squeezed Orange Juice (1L)',
+      price: 2000,
+      discountPrice: 1800,
+      rating: 4.8,
+      categories: 'Beverages & Drinks',
+      categoryId: 'Beverages & Drinks',
+      sellerId: 'store_4',
+      image_url: 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=800&auto=format&fit=crop&q=80',
+      description: '100% natural Valencia orange juice with pulp. No added sugar or artificial preservatives.',
+    },
+    {
+      $id: 'mock_gro_17',
+      id: 'mock_gro_17',
+      name: 'Frozen Mixed Berries (500g)',
+      price: 4000,
+      discountPrice: 3600,
+      rating: 4.8,
+      categories: 'Fruits & Vegetables',
+      categoryId: 'Fruits & Vegetables',
+      sellerId: 'store_4',
+      image_url: 'https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?w=800&auto=format&fit=crop&q=80',
+      description: 'Flash-frozen strawberries, blueberries, and raspberries. Great for smoothies and desserts.',
+    },
+  ],
+}
+
+export const getStoreById = async (storeId: string) => {
+  try {
+    if (!storeId) return null
+
+    // 1. Try direct document GET
+    try {
+      const doc = await databases.getDocument(
+        appwriteConfig.databaseId,
+        appwriteConfig.storesCollectionId,
+        storeId,
+      )
+      if (doc) return doc
+    } catch { }
+
+    // 2. Try sellerId query
+    try {
+      const bySeller = await databases.listDocuments(
+        appwriteConfig.databaseId,
+        appwriteConfig.storesCollectionId,
+        [Query.equal('sellerId', storeId)],
+      )
+      if (bySeller?.documents && bySeller.documents.length > 0) return bySeller.documents[0]
+    } catch { }
+
+    // 3. Try userId query
+    try {
+      const byUser = await databases.listDocuments(
+        appwriteConfig.databaseId,
+        appwriteConfig.storesCollectionId,
+        [Query.equal('userId', storeId)],
+      )
+      if (byUser?.documents && byUser.documents.length > 0) return byUser.documents[0]
+    } catch { }
+
+    // 4. Fallback search all stores from Appwrite
+    const all = await getStores()
+    const foundLive = all.find(
+      (s: any) =>
+        s.$id === storeId ||
+        s.id === storeId ||
+        s.sellerId === storeId ||
+        s.userId === storeId
+    )
+    if (foundLive) return foundLive
+
+    // 5. Fallback search default stores
+    const foundDefault = DEFAULT_STORES.find(
+      (s) => s.$id === storeId || s.id === storeId
+    )
+    return foundDefault || null
+  } catch (e) {
+    console.error('Error fetching store by ID:', e)
+    return DEFAULT_STORES.find((s) => s.$id === storeId || s.id === storeId) || null
+  }
+}
+
 export const getStoreByUserId = async (userId: string) => {
   try {
     const store = await databases.listDocuments(
@@ -470,29 +848,255 @@ export const updateStoreStatus = async (
   }
 }
 
+export const geocodeAddressCoords = async (address: string): Promise<{ latitude: number; longitude: number }> => {
+  if (!address || !address.trim()) {
+    return { latitude: 6.4698, longitude: 3.5852 }
+  }
+
+  const cleanAddr = address.trim()
+  const lower = cleanAddr.toLowerCase()
+
+  // 1. UTMOST FIX: Query OpenStreetMap Nominatim FIRST for exact street & building coordinates
+  try {
+    const searchQuery = lower.includes('nigeria') ? cleanAddr : `${cleanAddr}, Nigeria`
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1`, {
+      headers: { 'User-Agent': 'GroceryApp-Mobile/1.0' }
+    })
+    const data = await res.json()
+    if (data && data.length > 0) {
+      const lat = parseFloat(data[0].lat)
+      const lon = parseFloat(data[0].lon)
+      if (!isNaN(lat) && !isNaN(lon) && (lat !== 0 || lon !== 0)) {
+        console.log(`[GEOCODE] Online match for "${cleanAddr}": Lat ${lat}, Lng ${lon}`)
+        return { latitude: lat, longitude: lon }
+      }
+    }
+  } catch (err) {
+    console.log('[GEOCODE] Online geocoding offline/network fallback:', err)
+  }
+
+  // 2. BACKUP: Nationwide City & State Fast Dictionary (used if network fails or search returns empty)
+  if (lower.includes('ibadan') || lower.includes('akinyele') || lower.includes('bodija') || lower.includes('paul hendrickse') || lower.includes('university of ibadan') || lower.includes(' ui ')) {
+    return { latitude: 7.4477, longitude: 3.8967 }
+  }
+  if (lower.includes('abuja') || lower.includes('wuse') || lower.includes('maitama') || lower.includes('garki') || lower.includes('gwarinpa')) {
+    return { latitude: 9.0765, longitude: 7.3986 }
+  }
+  if (lower.includes('port harcourt') || lower.includes('phc') || lower.includes('gra') || lower.includes('rumuokoro')) {
+    return { latitude: 4.8156, longitude: 7.0498 }
+  }
+  if (lower.includes('kano')) {
+    return { latitude: 12.0022, longitude: 8.5920 }
+  }
+  if (lower.includes('enugu')) {
+    return { latitude: 6.4584, longitude: 7.5464 }
+  }
+  if (lower.includes('asaba')) {
+    return { latitude: 6.1984, longitude: 6.7262 }
+  }
+  if (lower.includes('benin')) {
+    return { latitude: 6.3350, longitude: 5.6037 }
+  }
+  if (lower.includes('abeokuta') || lower.includes('sango') || lower.includes('otta')) {
+    return { latitude: 7.1475, longitude: 3.3619 }
+  }
+  if (lower.includes('owerri')) {
+    return { latitude: 5.4832, longitude: 7.0358 }
+  }
+  if (lower.includes('calabar')) {
+    return { latitude: 4.9757, longitude: 8.3417 }
+  }
+  if (lower.includes('uyo')) {
+    return { latitude: 5.0377, longitude: 7.9128 }
+  }
+  if (lower.includes('akure')) {
+    return { latitude: 7.2571, longitude: 5.2058 }
+  }
+  if (lower.includes('ilorin')) {
+    return { latitude: 8.4799, longitude: 4.5418 }
+  }
+  if (lower.includes('kaduna')) {
+    return { latitude: 10.5105, longitude: 7.4165 }
+  }
+  if (lower.includes('jos')) {
+    return { latitude: 9.8965, longitude: 8.8583 }
+  }
+
+  // Lagos Areas Backup
+  if (lower.includes('ikeja') || lower.includes('allen') || lower.includes('alausa') || lower.includes('computer village')) {
+    return { latitude: 6.6018, longitude: 3.3515 }
+  }
+  if (lower.includes('victoria island') || lower.includes(' vi') || lower.includes('adeola') || lower.includes('ozumba')) {
+    return { latitude: 6.4281, longitude: 3.4219 }
+  }
+  if (lower.includes('ikoyi') || lower.includes('awolowo') || lower.includes('bourdillon')) {
+    return { latitude: 6.4549, longitude: 3.4347 }
+  }
+  if (lower.includes('lekki') || lower.includes('admiralty') || lower.includes('maroko')) {
+    return { latitude: 6.4698, longitude: 3.5852 }
+  }
+  if (lower.includes('ajah') || lower.includes('sangotedo') || lower.includes('chevron') || lower.includes('vgc')) {
+    return { latitude: 6.4678, longitude: 3.6012 }
+  }
+  if (lower.includes('yaba') || lower.includes('herbert macaulay') || lower.includes('sabo') || lower.includes('akoka')) {
+    return { latitude: 6.5095, longitude: 3.3711 }
+  }
+  if (lower.includes('surulere') || lower.includes('bode thomas') || lower.includes('stadium') || lower.includes('ojuelegba')) {
+    return { latitude: 6.4994, longitude: 3.3578 }
+  }
+  if (lower.includes('festac') || lower.includes('mile 2') || lower.includes('amuwo')) {
+    return { latitude: 6.4650, longitude: 3.2840 }
+  }
+  if (lower.includes('maryland') || lower.includes('anthony') || lower.includes('mende')) {
+    return { latitude: 6.5658, longitude: 3.3664 }
+  }
+  if (lower.includes('oshodi') || lower.includes('isolo') || lower.includes('ejigbo')) {
+    return { latitude: 6.5367, longitude: 3.3283 }
+  }
+  if (lower.includes('magodo') || lower.includes('ojodu') || lower.includes('berger')) {
+    return { latitude: 6.6268, longitude: 3.3789 }
+  }
+  if (lower.includes('gbagada') || lower.includes('oworonsoki') || lower.includes('oworonshoki')) {
+    return { latitude: 6.5540, longitude: 3.3888 }
+  }
+
+  return { latitude: 6.5244, longitude: 3.3792 }
+}
+
 export const updateStoreProfile = async (storeId: string, storeData: Partial<any>) => {
   try {
-    return await databases.updateDocument(
-      appwriteConfig.databaseId,
-      appwriteConfig.storesCollectionId,
-      storeId,
-      storeData,
-    )
+    const dataToSave = { ...storeData }
+
+    // Auto-allocate latitude & longitude immediately whenever address is entered or updated (no matter the state)
+    if (dataToSave.address) {
+      const coords = await geocodeAddressCoords(dataToSave.address)
+      dataToSave.latitude = coords.latitude
+      dataToSave.longitude = coords.longitude
+    }
+
+    // Update default stores in-memory array if storeId matches
+    const defIdx = DEFAULT_STORES.findIndex((s) => s.$id === storeId || s.id === storeId)
+    if (defIdx !== -1) {
+      DEFAULT_STORES[defIdx] = { ...DEFAULT_STORES[defIdx], ...dataToSave }
+    }
+
+    try {
+      return await databases.updateDocument(
+        appwriteConfig.databaseId,
+        appwriteConfig.storesCollectionId,
+        storeId,
+        dataToSave,
+      )
+    } catch {
+      return defIdx !== -1 ? DEFAULT_STORES[defIdx] : dataToSave
+    }
   } catch (e: any) {
     throw new Error(e.message || String(e))
   }
 }
 
 // ----------------------------------------------------
+// ⚡ DYNAMIC DELIVERY TIME ESTIMATION ENGINE
+// ----------------------------------------------------
+export const calculateEstimatedDeliveryTime = (
+  distanceKm: number
+): { label: string; minMinutes: number; maxMinutes: number } => {
+  if (distanceKm == null || isNaN(distanceKm) || distanceKm <= 0) {
+    return { label: '15-25 min', minMinutes: 15, maxMinutes: 25 }
+  }
+
+  if (distanceKm <= 1.0) {
+    return { label: '10-15 min', minMinutes: 10, maxMinutes: 15 }
+  } else if (distanceKm <= 3.0) {
+    return { label: '15-25 min', minMinutes: 15, maxMinutes: 25 }
+  } else if (distanceKm <= 7.0) {
+    return { label: '25-35 min', minMinutes: 25, maxMinutes: 35 }
+  } else if (distanceKm <= 12.0) {
+    return { label: '35-45 min', minMinutes: 35, maxMinutes: 45 }
+  } else if (distanceKm <= 20.0) {
+    return { label: '45-60 min', minMinutes: 45, maxMinutes: 60 }
+  } else {
+    return { label: 'Same Day Delivery', minMinutes: 60, maxMinutes: 180 }
+  }
+}
+
+// ----------------------------------------------------
+// 📍 LOCATION PROXIMITY INTELLIGENCE
+// ----------------------------------------------------
+export const sortStoresByProximity = (
+  storesList: any[],
+  customerLat?: number | null,
+  customerLon?: number | null
+): any[] => {
+  if (!storesList || storesList.length === 0) return []
+  const userLat = customerLat || 6.5244 // Default to Lagos Central if location pending
+  const userLon = customerLon || 3.3792
+
+  const mapped = storesList.map((st: any) => {
+    let distKm = 2.5
+    if (st && st.latitude != null && st.longitude != null) {
+      distKm = calculateHaversineDistanceKm(userLat, userLon, Number(st.latitude), Number(st.longitude))
+    }
+    const timeEst = calculateEstimatedDeliveryTime(distKm)
+    return {
+      ...st,
+      distanceKm: distKm,
+      estimatedDeliveryTime: timeEst.label,
+    }
+  })
+
+  // Sort stores ascending by distance (nearest stores first)
+  return mapped.sort((a, b) => a.distanceKm - b.distanceKm)
+}
+
+export const sortProductsByProximity = (
+  productsList: any[],
+  storesList: any[],
+  customerLat?: number | null,
+  customerLon?: number | null
+): any[] => {
+  if (!productsList || productsList.length === 0) return []
+  const sortedStores = sortStoresByProximity(storesList, customerLat, customerLon)
+  const storeDistanceMap: Record<string, number> = {}
+
+  for (const st of sortedStores) {
+    const sId = st.$id || st.id
+    if (sId) {
+      storeDistanceMap[sId] = st.distanceKm ?? 2.5
+    }
+  }
+
+  const mapped = productsList.map((p: any) => {
+    const sId = p.sellerId || p.seller_id || p.storeId
+    const distKm = sId && storeDistanceMap[sId] != null ? storeDistanceMap[sId] : 5.0
+    return {
+      ...p,
+      distanceKm: distKm,
+    }
+  })
+
+  // Sort products ascending by seller proximity
+  return mapped.sort((a, b) => a.distanceKm - b.distanceKm)
+}
+
+// ----------------------------------------------------
 // 📦 PRODUCTS & MENU MANAGEMENT
 // ----------------------------------------------------
-export const getMenu = async ({ category, query, sellerId }: GetMenuParams) => {
+export const getMenu = async ({ category, query, sellerId }: GetMenuParams = {}) => {
   try {
     const queries: string[] = [Query.limit(100)]
 
-    if (category && category !== 'all') queries.push(Query.equal('categories', category))
     if (query) queries.push(Query.search('name', query))
-    if (sellerId) queries.push(Query.equal('sellerId', sellerId))
+
+    if (sellerId) {
+      if (Array.isArray(sellerId)) {
+        if (sellerId.length > 0) {
+          queries.push(Query.equal('sellerId', sellerId))
+        }
+      } else if (typeof sellerId === 'string' && sellerId.trim() !== '') {
+        queries.push(Query.equal('sellerId', sellerId))
+      }
+    }
 
     const collectionsToQuery = [
       appwriteConfig.menuCollectionId,
@@ -512,7 +1116,13 @@ export const getMenu = async ({ category, query, sellerId }: GetMenuParams) => {
         for (const doc of res.documents) {
           if (!seenIds.has(doc.$id)) {
             seenIds.add(doc.$id)
-            allDocs.push(doc)
+            const normalized = {
+              ...doc,
+              categories: doc.categories || doc.categoryId || 'General',
+              categoryId: doc.categoryId || doc.categories || 'General',
+              sellerId: doc.sellerId || doc.storeId || '',
+            }
+            allDocs.push(normalized)
           }
         }
       } catch {
@@ -520,8 +1130,79 @@ export const getMenu = async ({ category, query, sellerId }: GetMenuParams) => {
       }
     }
 
+    // Apply category filter if requested
+    if (category && category !== 'all') {
+      const catLower = category.toLowerCase().trim()
+      return allDocs.filter((d) => {
+        const c1 = String(d.categories || '').toLowerCase()
+        const c2 = String(d.categoryId || '').toLowerCase()
+        const c3 = String(d.category || '').toLowerCase()
+        const c4 = String(d.type || '').toLowerCase()
+        return c1.includes(catLower) || c2.includes(catLower) || c3.includes(catLower) || c4.includes(catLower)
+      })
+    }
+
     return allDocs
   } catch (e) {
+    console.error('Error fetching menu:', e)
+    return []
+  }
+}
+
+/**
+ * Strictly fetches products that belong to a specific store.
+ * Returns only products assigned to this store, without cross-store contamination.
+ */
+export const getProductsByStore = async (storeOrId: string | any) => {
+  try {
+    if (!storeOrId) return []
+
+    let storeDoc: any = null
+    let storeParamId = ''
+
+    if (typeof storeOrId === 'object' && storeOrId !== null) {
+      storeDoc = storeOrId
+      storeParamId = storeDoc.$id || storeDoc.id || ''
+    } else if (typeof storeOrId === 'string') {
+      storeParamId = storeOrId
+      storeDoc = await getStoreById(storeOrId)
+    }
+
+    const candidateIds = Array.from(
+      new Set([
+        storeDoc?.$id,
+        storeDoc?.id,
+        storeDoc?.userId,
+        storeDoc?.sellerId,
+        storeParamId,
+      ])
+    ).filter(Boolean) as string[]
+
+    if (candidateIds.length === 0) return []
+
+    // Fetch products filtered by candidate store IDs
+    const allLiveProducts = await getMenu({})
+
+    const matchedProducts = allLiveProducts.filter((p: any) => {
+      if (!p) return false
+      const pSeller = String(p.sellerId || p.storeId || p.sellerStoreId || '').trim()
+      return candidateIds.some((cid) => cid && (cid === pSeller || pSeller.includes(cid)))
+    })
+
+    if (matchedProducts.length > 0) {
+      return matchedProducts
+    }
+
+    // If it's a fallback mock store ID (e.g. store_1, store_2, store_3, store_4), provide its dedicated mock items
+    const mockKey = candidateIds.find((id) => id && DEFAULT_STORE_PRODUCTS[id])
+    if (mockKey && DEFAULT_STORE_PRODUCTS[mockKey]) {
+      return DEFAULT_STORE_PRODUCTS[mockKey]
+    }
+
+    // For real stores in the database with 0 items, return empty array (do NOT dump other stores' items!)
+    return []
+  } catch (err) {
+    console.error('Error in getProductsByStore:', err)
     return []
   }
 }
@@ -542,7 +1223,8 @@ export const getMenuItemById = async (id: string) => {
       )
     }
   } catch (e) {
-    throw new Error(e as string)
+    console.warn(`Product ID "${id}" not found in database:`, e)
+    return null
   }
 }
 
@@ -765,6 +1447,12 @@ export const createOrder = async (orderData: {
   paymentStatus: string
   sellerId?: string
   orderNotes?: string
+  storeLatitude?: number
+  storeLongitude?: number
+  customerLatitude?: number
+  customerLongitude?: number
+  deliveryDistanceKm?: number
+  deliveryFee?: number
 }) => {
   const payload: any = {
     userId: orderData.userId,
@@ -779,12 +1467,14 @@ export const createOrder = async (orderData: {
     createdAt: new Date().toISOString(),
   }
 
-  if (orderData.sellerId) {
-    payload.sellerId = orderData.sellerId
-  }
-  if (orderData.orderNotes && orderData.orderNotes.trim()) {
-    payload.orderNotes = orderData.orderNotes.trim()
-  }
+  if (orderData.sellerId) payload.sellerId = orderData.sellerId
+  if (orderData.orderNotes && orderData.orderNotes.trim()) payload.orderNotes = orderData.orderNotes.trim()
+  if (orderData.storeLatitude != null) payload.storeLatitude = Number(orderData.storeLatitude)
+  if (orderData.storeLongitude != null) payload.storeLongitude = Number(orderData.storeLongitude)
+  if (orderData.customerLatitude != null) payload.customerLatitude = Number(orderData.customerLatitude)
+  if (orderData.customerLongitude != null) payload.customerLongitude = Number(orderData.customerLongitude)
+  if (orderData.deliveryDistanceKm != null) payload.deliveryDistanceKm = Number(orderData.deliveryDistanceKm)
+  if (orderData.deliveryFee != null) payload.deliveryFee = Number(orderData.deliveryFee)
 
   try {
     return await databases.createDocument(
@@ -940,9 +1630,33 @@ export const updateOrderStatus = async (orderId: string, status: string) => {
 
 export const uploadAvatar = async (userId: string, userDocId: string, fileUri: string) => {
   try {
-    return await uploadImageToStorage(fileUri, `avatar_${userId}`)
-  } catch (e) {
-    throw new Error(e as string)
+    // 1. Delete previous custom avatar from Appwrite Storage if replacing an existing one
+    if (userDocId) {
+      try {
+        const currentDoc = await databases.getDocument(
+          appwriteConfig.databaseId,
+          appwriteConfig.userCollectionId,
+          userDocId,
+        )
+        if (currentDoc?.avatar) {
+          await deleteStorageFileByUrl(currentDoc.avatar)
+        }
+      } catch {
+        // Non-fatal error during previous avatar lookup
+      }
+    }
+
+    // 2. Upload new image file to Appwrite Storage
+    const newAvatarUrl = await uploadImageToStorage(fileUri, `avatar_${userId}`)
+
+    // 3. Update user profile document in database with the replacement avatar URL
+    if (userDocId) {
+      await updateUserProfile(userDocId, { avatar: newAvatarUrl })
+    }
+
+    return newAvatarUrl
+  } catch (e: any) {
+    throw new Error(e.message || String(e))
   }
 }
 
@@ -1172,6 +1886,52 @@ export const debitCustomerWallet = async (
   } catch (e: any) {
     console.error('debitCustomerWallet error:', e)
     throw new Error(e.message || String(e))
+  }
+}
+
+export const recordWalletTransaction = async ({
+  userId,
+  amount,
+  type = 'debit',
+  category = 'order_payment',
+  description = 'Transaction record',
+  reference = `TX_${Date.now()}`,
+}: {
+  userId: string
+  amount: number
+  type?: 'credit' | 'debit'
+  category?: string
+  description?: string
+  reference?: string
+}) => {
+  try {
+    const tx = await databases.createDocument(
+      appwriteConfig.databaseId,
+      appwriteConfig.walletTransactionsCollectionId,
+      ID.unique(),
+      {
+        userId,
+        amount: Number(amount),
+        type,
+        category,
+        description,
+        reference,
+        createdAt: new Date().toISOString(),
+      },
+    )
+    return tx
+  } catch (e: any) {
+    console.warn('recordWalletTransaction failed, fallback returned:', e)
+    return {
+      $id: `tx_${Date.now()}`,
+      userId,
+      amount: Number(amount),
+      type,
+      category,
+      description,
+      reference,
+      createdAt: new Date().toISOString(),
+    }
   }
 }
 
@@ -1408,8 +2168,20 @@ function defaultPolicies() {
     sellerOrderCancellationAllowed: true,
     defaultCommissionRate: 10.0,
     refundsEnabled: true,
+    deliveryPricingMode: 'flat',
     deliveryFee: 1000,
-    freeDeliveryThreshold: 10000,
+    baseCoverageThreshold: 10000,
+    feePerItem: 200,
+    deliveryIncrementType: 'amount_step',
+    deliveryIncrementRate: 2,
+    deliveryIncrementStep: 5000,
+    maxDeliveryFee: 5000,
+    freeDeliveryThreshold: 0,
+    distanceBaseRate: 800,
+    distanceMidRate: 1200,
+    distanceFarRate: 1800,
+    distancePerKmRate: 150,
+    maxDeliveryRadiusKm: 20,
     appName: 'Grocery App',
     appLogo: null,
     appTagline: 'Fresh Groceries & Daily Essentials',
@@ -1418,63 +2190,274 @@ function defaultPolicies() {
 
 export const getPlatformPolicies = async () => {
   try {
-    // 1. Check local in-memory cache first
-    if (Object.keys(localPolicyCache).length === 0) {
-      // 2. Read from persistent AsyncStorage
-      try {
-        const stored = await AsyncStorage.getItem(POLICY_STORAGE_KEY)
-        if (stored) {
-          localPolicyCache = JSON.parse(stored)
-        }
-      } catch (storageErr) {
-        console.warn('Could not read policies from AsyncStorage:', storageErr)
-      }
-    }
-
-    // 3. Sync from Appwrite database if available
+    // 1. Fetch live document from Appwrite Cloud database
     let docs: any = null
     try {
       docs = await databases.listDocuments(
         appwriteConfig.databaseId,
         appwriteConfig.platformPoliciesCollectionId,
       )
-    } catch {
-      // Database offline/unavailable fallback
-      return { ...defaultPolicies(), ...localPolicyCache }
+    } catch (dbErr) {
+      console.warn('Could not fetch policies from Appwrite DB, checking local cache:', dbErr)
     }
 
     if (docs && docs.documents && docs.documents.length > 0) {
       const dbDoc = docs.documents[0]
-      // Merge defaults, dbDoc, and localPolicyCache so admin changes persist cleanly
-      const merged = { ...defaultPolicies(), ...dbDoc, ...localPolicyCache }
-      // Clean up undefined / null fields if dbDoc has valid numeric values
-      if (dbDoc.deliveryFee !== undefined && dbDoc.deliveryFee !== null) {
-        merged.deliveryFee = Number(dbDoc.deliveryFee)
-      }
-      if (dbDoc.freeDeliveryThreshold !== undefined && dbDoc.freeDeliveryThreshold !== null) {
-        merged.freeDeliveryThreshold = Number(dbDoc.freeDeliveryThreshold)
-      }
+      const defaults = defaultPolicies()
+      // Priority Order: defaultPolicies -> localPolicyCache -> dbDoc (dbDoc from Appwrite database HAS ABSOLUTE TOP PRIORITY)
+      const merged = { ...defaults, ...localPolicyCache, ...dbDoc }
+
+      // Clean numeric and string fields with safe fallbacks if null or undefined
+      merged.deliveryPricingMode = (dbDoc.deliveryPricingMode === 'distance' || dbDoc.deliveryPricingMode === 'flat') ? dbDoc.deliveryPricingMode : defaults.deliveryPricingMode
+      merged.deliveryFee = dbDoc.deliveryFee != null ? Number(dbDoc.deliveryFee) : defaults.deliveryFee
+      merged.baseCoverageThreshold = dbDoc.baseCoverageThreshold != null ? Number(dbDoc.baseCoverageThreshold) : defaults.baseCoverageThreshold
+      merged.feePerItem = dbDoc.feePerItem != null ? Number(dbDoc.feePerItem) : defaults.feePerItem
+      merged.deliveryIncrementType = dbDoc.deliveryIncrementType != null ? String(dbDoc.deliveryIncrementType) : defaults.deliveryIncrementType
+      merged.deliveryIncrementRate = dbDoc.deliveryIncrementRate != null ? Number(dbDoc.deliveryIncrementRate) : defaults.deliveryIncrementRate
+      merged.deliveryIncrementStep = dbDoc.deliveryIncrementStep != null ? Number(dbDoc.deliveryIncrementStep) : defaults.deliveryIncrementStep
+      merged.maxDeliveryFee = dbDoc.maxDeliveryFee != null ? Number(dbDoc.maxDeliveryFee) : defaults.maxDeliveryFee
+      merged.freeDeliveryThreshold = dbDoc.freeDeliveryThreshold != null ? Number(dbDoc.freeDeliveryThreshold) : defaults.freeDeliveryThreshold
+      merged.defaultCommissionRate = dbDoc.defaultCommissionRate != null ? Number(dbDoc.defaultCommissionRate) : defaults.defaultCommissionRate
+
+      merged.distanceBaseRate = dbDoc.distanceBaseRate != null ? Number(dbDoc.distanceBaseRate) : defaults.distanceBaseRate
+      merged.distanceMidRate = dbDoc.distanceMidRate != null ? Number(dbDoc.distanceMidRate) : defaults.distanceMidRate
+      merged.distanceFarRate = dbDoc.distanceFarRate != null ? Number(dbDoc.distanceFarRate) : defaults.distanceFarRate
+      merged.distancePerKmRate = dbDoc.distancePerKmRate != null ? Number(dbDoc.distancePerKmRate) : defaults.distancePerKmRate
+      merged.maxDeliveryRadiusKm = dbDoc.maxDeliveryRadiusKm != null ? Number(dbDoc.maxDeliveryRadiusKm) : defaults.maxDeliveryRadiusKm
+
+      merged.cartMode = dbDoc.cartMode || defaults.cartMode
+      merged.productApprovalRequired = dbDoc.productApprovalRequired ?? defaults.productApprovalRequired
+      merged.sellerOrderCancellationAllowed = dbDoc.sellerOrderCancellationAllowed ?? defaults.sellerOrderCancellationAllowed
+      merged.refundsEnabled = dbDoc.refundsEnabled ?? defaults.refundsEnabled
+      merged.appName = dbDoc.appName || defaults.appName
+      merged.appLogo = dbDoc.appLogo !== undefined ? dbDoc.appLogo : defaults.appLogo
+      merged.appTagline = dbDoc.appTagline || defaults.appTagline
+
+      // Sync latest database values into in-memory cache and AsyncStorage
       localPolicyCache = merged
       AsyncStorage.setItem(POLICY_STORAGE_KEY, JSON.stringify(merged)).catch(() => { })
       return merged
     }
 
-    const fallbackMerged = { ...defaultPolicies(), ...localPolicyCache }
-    return fallbackMerged
+    // 2. Read from persistent AsyncStorage fallback if database document isn't created yet or offline
+    try {
+      const stored = await AsyncStorage.getItem(POLICY_STORAGE_KEY)
+      if (stored) {
+        localPolicyCache = JSON.parse(stored)
+      }
+    } catch { }
+
+    return { ...defaultPolicies(), ...localPolicyCache }
   } catch (e) {
     return { ...defaultPolicies(), ...localPolicyCache }
   }
 }
 
-export const getDeliveryFeeSettings = async () => {
+export interface DeliveryFeeSettings {
+  deliveryPricingMode: 'flat' | 'distance'
+  deliveryFee: number
+  baseCoverageThreshold: number
+  feePerItem: number
+  deliveryIncrementType: 'per_item' | 'amount_percent' | 'amount_step'
+  deliveryIncrementRate: number
+  deliveryIncrementStep: number
+  maxDeliveryFee: number
+  freeDeliveryThreshold: number
+  distanceBaseRate: number
+  distanceMidRate: number
+  distanceFarRate: number
+  distancePerKmRate: number
+  maxDeliveryRadiusKm: number
+}
+
+export const getDeliveryFeeSettings = async (): Promise<DeliveryFeeSettings> => {
   try {
     const policy: any = await getPlatformPolicies()
     return {
-      deliveryFee: Number(policy?.deliveryFee !== undefined ? policy.deliveryFee : 1000),
-      freeDeliveryThreshold: Number(policy?.freeDeliveryThreshold !== undefined ? policy.freeDeliveryThreshold : 10000),
+      deliveryPricingMode: policy?.deliveryPricingMode === 'distance' ? 'distance' : 'flat',
+      deliveryFee: Number(policy?.deliveryFee != null ? policy.deliveryFee : 1000),
+      baseCoverageThreshold: Number(policy?.baseCoverageThreshold != null ? policy.baseCoverageThreshold : 10000),
+      feePerItem: Number(policy?.feePerItem != null ? policy.feePerItem : 200),
+      deliveryIncrementType: (policy?.deliveryIncrementType || 'amount_step') as any,
+      deliveryIncrementRate: Number(policy?.deliveryIncrementRate != null ? policy.deliveryIncrementRate : 2),
+      deliveryIncrementStep: Number(policy?.deliveryIncrementStep != null ? policy.deliveryIncrementStep : 5000),
+      maxDeliveryFee: Number(policy?.maxDeliveryFee != null ? policy.maxDeliveryFee : 5000),
+      freeDeliveryThreshold: Number(policy?.freeDeliveryThreshold != null ? policy.freeDeliveryThreshold : 0),
+      distanceBaseRate: Number(policy?.distanceBaseRate != null ? policy.distanceBaseRate : 800),
+      distanceMidRate: Number(policy?.distanceMidRate != null ? policy.distanceMidRate : 1200),
+      distanceFarRate: Number(policy?.distanceFarRate != null ? policy.distanceFarRate : 1800),
+      distancePerKmRate: Number(policy?.distancePerKmRate != null ? policy.distancePerKmRate : 150),
+      maxDeliveryRadiusKm: Number(policy?.maxDeliveryRadiusKm != null ? policy.maxDeliveryRadiusKm : 20),
     }
   } catch {
-    return { deliveryFee: 1000, freeDeliveryThreshold: 10000 }
+    return {
+      deliveryPricingMode: 'flat',
+      deliveryFee: 1000,
+      baseCoverageThreshold: 10000,
+      feePerItem: 200,
+      deliveryIncrementType: 'amount_step',
+      deliveryIncrementRate: 2,
+      deliveryIncrementStep: 5000,
+      maxDeliveryFee: 5000,
+      freeDeliveryThreshold: 0,
+      distanceBaseRate: 800,
+      distanceMidRate: 1200,
+      distanceFarRate: 1800,
+      distancePerKmRate: 150,
+      maxDeliveryRadiusKm: 20,
+    }
+  }
+}
+
+export function calculateHaversineDistanceKm(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 2.5
+  const R = 6371
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLon = ((lon2 - lon1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  const distance = R * c
+  return Math.round(distance * 10) / 10
+}
+
+export const calculateDynamicDeliveryFee = (
+  totalItems: number,
+  subtotal: number,
+  settings: DeliveryFeeSettings,
+  options?: {
+    distanceKm?: number
+    userLocation?: { latitude: number; longitude: number }
+    storeLocation?: { latitude: number; longitude: number }
+  }
+) => {
+  // 1. Free Delivery check
+  if (settings.freeDeliveryThreshold > 0 && subtotal >= settings.freeDeliveryThreshold) {
+    return {
+      baseFee: settings.deliveryFee,
+      incrementalFee: 0,
+      totalDeliveryFee: 0,
+      isFree: true,
+      distanceKm: 0,
+      isOutOfRange: false,
+      breakdownText: 'FREE Delivery (High-value order offer 🎉)',
+    }
+  }
+
+  let distanceKm = options?.distanceKm
+  if (distanceKm === undefined && options?.userLocation && options?.storeLocation) {
+    distanceKm = calculateHaversineDistanceKm(
+      options.userLocation.latitude,
+      options.userLocation.longitude,
+      options.storeLocation.latitude,
+      options.storeLocation.longitude
+    )
+  }
+  if (distanceKm === undefined) {
+    distanceKm = 2.5
+  }
+
+  const isDistanceMode = settings.deliveryPricingMode === 'distance'
+  let baseFee = Math.max(0, Number(settings.deliveryFee || 0))
+  let tierLabel = 'Standard'
+  let isOutOfRange = false
+
+  if (isDistanceMode) {
+    const distBase = Number(settings.distanceBaseRate || 800)
+    const distMid = Number(settings.distanceMidRate || 1200)
+    const distFar = Number(settings.distanceFarRate || 1800)
+    const perKm = Number(settings.distancePerKmRate || 150)
+    const maxRadius = Number(settings.maxDeliveryRadiusKm || 20)
+
+    if (maxRadius > 0 && distanceKm > maxRadius) {
+      isOutOfRange = true
+    }
+
+    if (distanceKm <= 3) {
+      baseFee = distBase
+      tierLabel = `Zone 1 (0–3 km: ${distanceKm} km)`
+    } else if (distanceKm <= 7) {
+      baseFee = distMid
+      tierLabel = `Zone 2 (3–7 km: ${distanceKm} km)`
+    } else if (distanceKm <= 12) {
+      baseFee = distFar
+      tierLabel = `Zone 3 (7–12 km: ${distanceKm} km)`
+    } else {
+      const rawExtra = Math.ceil(distanceKm - 12)
+      const extraKm = isOutOfRange ? Math.min(15, rawExtra) : rawExtra
+      baseFee = distFar + extraKm * perKm
+      tierLabel = isOutOfRange ? `Out of Delivery Radius (${distanceKm} km)` : `Zone 4 (${distanceKm} km)`
+    }
+  }
+
+  const baseCoverage = Math.max(0, Number(settings.baseCoverageThreshold !== undefined ? settings.baseCoverageThreshold : 10000))
+
+  // 2. Base Coverage: Covers any order up to baseCoverageThreshold (e.g. ₦10,000)
+  if (baseCoverage > 0 && subtotal <= baseCoverage) {
+    return {
+      baseFee,
+      incrementalFee: 0,
+      totalDeliveryFee: baseFee,
+      isFree: false,
+      distanceKm,
+      isOutOfRange,
+      breakdownText: `${isDistanceMode ? tierLabel : 'Base'} ₦${baseFee.toLocaleString()} (Covers orders up to ₦${baseCoverage.toLocaleString()})`,
+    }
+  }
+
+  // 3. Excess Calculation for orders above baseCoverageThreshold
+  const excessAmount = Math.max(0, subtotal - baseCoverage)
+  let incrementalFee = 0
+  let breakdownText = `${isDistanceMode ? tierLabel : 'Base'} ₦${baseFee.toLocaleString()} (Up to ₦${baseCoverage.toLocaleString()})`
+
+  if (settings.deliveryIncrementType === 'amount_percent') {
+    const rate = Number(settings.deliveryIncrementRate || 0)
+    incrementalFee = Math.round(excessAmount * (rate / 100))
+    if (rate > 0) {
+      breakdownText += ` + (${rate}% on ₦${excessAmount.toLocaleString()} over ₦${baseCoverage.toLocaleString()})`
+    }
+  } else if (settings.deliveryIncrementType === 'amount_step') {
+    const step = Math.max(1, Number(settings.deliveryIncrementStep || 5000))
+    const perStep = Number(settings.feePerItem || 200)
+    const stepCount = Math.ceil(excessAmount / step)
+    incrementalFee = stepCount * perStep
+    if (stepCount > 0 && perStep > 0) {
+      breakdownText += ` + (${stepCount} tier × ₦${perStep.toLocaleString()} for ₦${excessAmount.toLocaleString()} over ₦${baseCoverage.toLocaleString()})`
+    }
+  } else {
+    // per_item
+    const extraItems = Math.max(0, totalItems - 1)
+    const perItem = Number(settings.feePerItem || 0)
+    incrementalFee = extraItems * perItem
+    if (extraItems > 0 && perItem > 0) {
+      breakdownText += ` + (₦${perItem.toLocaleString()} × ${extraItems} extra ${extraItems === 1 ? 'item' : 'items'})`
+    }
+  }
+
+  let total = baseFee + incrementalFee
+
+  if (settings.maxDeliveryFee > 0 && total > settings.maxDeliveryFee) {
+    total = settings.maxDeliveryFee
+    breakdownText += ` (Capped at ₦${settings.maxDeliveryFee.toLocaleString()})`
+  }
+
+  return {
+    baseFee,
+    incrementalFee,
+    totalDeliveryFee: Math.max(0, total),
+    isFree: false,
+    distanceKm,
+    isOutOfRange,
+    breakdownText,
   }
 }
 
@@ -1496,6 +2479,8 @@ export const updatePlatformPolicies = async (policyData: Partial<any>) => {
     delete payload.$databaseId
     delete payload.$collectionId
 
+    const targetDocId = existing?.$id || 'global_policy'
+
     // 3. Resilient retry loop to sync to Appwrite
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
@@ -1503,7 +2488,7 @@ export const updatePlatformPolicies = async (policyData: Partial<any>) => {
           await databases.updateDocument(
             appwriteConfig.databaseId,
             appwriteConfig.platformPoliciesCollectionId,
-            'global_policy',
+            targetDocId,
             payload,
           )
           return merged
@@ -1513,7 +2498,7 @@ export const updatePlatformPolicies = async (policyData: Partial<any>) => {
             await databases.createDocument(
               appwriteConfig.databaseId,
               appwriteConfig.platformPoliciesCollectionId,
-              'global_policy',
+              targetDocId,
               payload,
             )
             return merged
@@ -1538,8 +2523,20 @@ export const updatePlatformPolicies = async (policyData: Partial<any>) => {
             'sellerOrderCancellationAllowed',
             'defaultCommissionRate',
             'refundsEnabled',
+            'deliveryPricingMode',
             'deliveryFee',
+            'baseCoverageThreshold',
+            'feePerItem',
+            'deliveryIncrementType',
+            'deliveryIncrementRate',
+            'deliveryIncrementStep',
+            'maxDeliveryFee',
             'freeDeliveryThreshold',
+            'distanceBaseRate',
+            'distanceMidRate',
+            'distanceFarRate',
+            'distancePerKmRate',
+            'maxDeliveryRadiusKm',
             'appName',
             'appLogo',
             'appTagline',

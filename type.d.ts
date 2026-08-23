@@ -34,6 +34,8 @@ export interface Store extends Models.Document {
     status: 'active' | 'pending' | 'suspended';
     walletBalance?: number;
     allowedCategories?: string;
+    latitude?: number;
+    longitude?: number;
 }
 
 export interface WalletTransaction extends Models.Document {
@@ -82,8 +84,6 @@ export interface MenuItem extends Models.Document {
     price: number;
     image_url: string;
     description: string;
-    calories?: number;
-    protein?: number;
     rating?: number;
     type?: string;
     sellerId?: string;
@@ -195,6 +195,6 @@ interface SignInParams {
 interface GetMenuParams {
     category?: string;
     query?: string;
-    sellerId?: string;
+    sellerId?: string | string[];
 }
 

@@ -1,10 +1,27 @@
+import FastImage from '@/components/FastImage'
+import LocationPickerModal from '@/components/LocationPickerModal'
+import { images } from '@/constants'
+import {
+  createSellerAccount,
+  deleteStorageFileByUrl,
+  getSellerPayoutLogs,
+  getStores,
+  processSellerPayout,
+  updateStoreProfile,
+  updateStoreStatus,
+  uploadImageToStorage,
+} from '@/lib/appwrite'
+import * as ImagePicker from 'expo-image-picker'
+import { useRouter } from 'expo-router'
 import React, { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   Text,
   TextInput,
@@ -12,15 +29,6 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
-import {
-  getStores,
-  createSellerAccount,
-  updateStoreStatus,
-  processSellerPayout,
-  getSellerPayoutLogs,
-} from '@/lib/appwrite'
-import { images } from '@/constants'
 
 
 
@@ -40,9 +48,113 @@ export default function AdminSellers() {
   const [storeName, setStoreName] = useState('')
   const [phone, setPhone] = useState('')
 
-  // Edit Status / Commission Modal
+  // Edit Status / Commission / Profile Modal
   const [editStoreModal, setEditStoreModal] = useState<any>(null)
-  const [commissionRate, setCommissionRate] = useState('10.0')
+  const [editStoreName, setEditStoreName] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editAddress, setEditAddress] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editLogoUrl, setEditLogoUrl] = useState<string | null>(null)
+  const [editBannerUrl, setEditBannerUrl] = useState<string | null>(null)
+  const [editCommissionRate, setEditCommissionRate] = useState('10.0')
+  const [editStatus, setEditStatus] = useState('active')
+  const [savingStore, setSavingStore] = useState(false)
+  const [storeMapPickerVisible, setStoreMapPickerVisible] = useState(false)
+  const [editLatitude, setEditLatitude] = useState<number | null>(null)
+  const [editLongitude, setEditLongitude] = useState<number | null>(null)
+
+  const openEditStoreModal = (st: any) => {
+    setEditStoreModal(st)
+    setEditStoreName(st.storeName || '')
+    setEditDescription(st.description || '')
+    setEditAddress(st.address || '')
+    setEditPhone(st.phone || '')
+    setEditLogoUrl(st.logoUrl || null)
+    setEditBannerUrl(st.bannerUrl || null)
+    setEditCommissionRate((st.commissionRate || 10.0).toString())
+    setEditStatus(st.status || 'active')
+    setEditLatitude(st.latitude != null ? Number(st.latitude) : null)
+    setEditLongitude(st.longitude != null ? Number(st.longitude) : null)
+  }
+
+  const handlePickEditLogo = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      })
+      if (!result.canceled && result.assets[0]?.uri) {
+        setEditLogoUrl(result.assets[0].uri)
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Image picker failed.')
+    }
+  }
+
+  const handlePickEditBanner = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      })
+      if (!result.canceled && result.assets[0]?.uri) {
+        setEditBannerUrl(result.assets[0].uri)
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Image picker failed.')
+    }
+  }
+
+  const handleSaveStoreDetails = async () => {
+    if (!editStoreName.trim()) {
+      return Alert.alert('Validation Error', 'Please enter store name.')
+    }
+    if (!editStoreModal) return
+
+    try {
+      setSavingStore(true)
+      let finalLogo = editLogoUrl
+      let finalBanner = editBannerUrl
+
+      if (editLogoUrl && (editLogoUrl.startsWith('file:') || editLogoUrl.startsWith('ph:'))) {
+        if (editStoreModal.logoUrl) {
+          await deleteStorageFileByUrl(editStoreModal.logoUrl)
+        }
+        finalLogo = await uploadImageToStorage(editLogoUrl, 'store_logo')
+      }
+      if (editBannerUrl && (editBannerUrl.startsWith('file:') || editBannerUrl.startsWith('ph:'))) {
+        if (editStoreModal.bannerUrl) {
+          await deleteStorageFileByUrl(editStoreModal.bannerUrl)
+        }
+        finalBanner = await uploadImageToStorage(editBannerUrl, 'store_banner')
+      }
+
+      await updateStoreProfile(editStoreModal.$id, {
+        storeName: editStoreName.trim(),
+        description: editDescription.trim(),
+        address: editAddress.trim(),
+        phone: editPhone.trim(),
+        logoUrl: finalLogo,
+        bannerUrl: finalBanner,
+        commissionRate: parseFloat(editCommissionRate) || 10.0,
+        status: editStatus,
+        latitude: editLatitude || undefined,
+        longitude: editLongitude || undefined,
+      })
+
+      Alert.alert('Success', `Store "${editStoreName}" profile & pictures updated!`)
+      setEditStoreModal(null)
+      fetchStores()
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Could not save store details.')
+    } finally {
+      setSavingStore(false)
+    }
+  }
 
   const fetchStores = async () => {
     try {
@@ -93,7 +205,7 @@ export default function AdminSellers() {
   const handleUpdateStore = async (status: string) => {
     if (!editStoreModal) return
     try {
-      const rate = parseFloat(commissionRate) || 10.0
+      const rate = parseFloat(editCommissionRate) || 10.0
       await updateStoreStatus(editStoreModal.$id, status, rate)
       Alert.alert('Updated', `Store status changed to "${status}"`)
       setEditStoreModal(null)
@@ -151,7 +263,7 @@ export default function AdminSellers() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
       {/* Header */}
       <View className="px-5 pt-4 pb-3 flex-row justify-between items-center bg-white border-b border-primary/10">
         <TouchableOpacity
@@ -180,7 +292,7 @@ export default function AdminSellers() {
 
       {loading ? (
         <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color="#16A34A" />
+          <ActivityIndicator size="large" color="#53B175" />
         </View>
       ) : (
         <FlatList
@@ -222,16 +334,14 @@ export default function AdminSellers() {
                 </View>
 
                 <View
-                  className={`px-3 py-1 rounded-full border ${
-                    item.status === 'active'
+                  className={`px-3 py-1 rounded-full border ${item.status === 'active'
                       ? 'bg-green-500/10 border-green-500/30'
                       : 'bg-red-500/10 border-red-500/30'
-                  }`}
+                    }`}
                 >
                   <Text
-                    className={`font-quicksand-bold text-xs capitalize ${
-                      item.status === 'active' ? 'text-green-700' : 'text-red-700'
-                    }`}
+                    className={`font-quicksand-bold text-xs capitalize ${item.status === 'active' ? 'text-green-700' : 'text-red-700'
+                      }`}
                   >
                     {item.status || 'Active'}
                   </Text>
@@ -258,14 +368,11 @@ export default function AdminSellers() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  onPress={() => {
-                    setEditStoreModal(item)
-                    setCommissionRate((item.commissionRate || 10.0).toString())
-                  }}
+                  onPress={() => openEditStoreModal(item)}
                   className="bg-primary/10 border border-primary/20 px-3 py-2 rounded-xl"
                 >
                   <Text className="text-primary font-quicksand-bold text-xs">
-                    ⚙️ Manage Status
+                    ⚙️ Edit Store Profile & Status
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -277,7 +384,10 @@ export default function AdminSellers() {
 
       {/* Modal: Create Seller Account */}
       <Modal visible={createModalVisible} animationType="slide" transparent>
-        <View className="flex-1 bg-black/60 justify-end">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          className="flex-1 justify-end bg-black/60"
+        >
           <View className="bg-white rounded-t-[32px] p-6 max-h-[90%] shadow-2xl">
             <View className="flex-row justify-between items-center mb-5">
               <Text className="text-xl font-quicksand-bold text-dark-100">
@@ -291,7 +401,7 @@ export default function AdminSellers() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView contentContainerStyle={{ paddingBottom: 30 }} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               <Text className="font-quicksand-bold text-sm text-dark-100 mb-1">
                 Seller Full Name *
               </Text>
@@ -361,65 +471,221 @@ export default function AdminSellers() {
               </TouchableOpacity>
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
-      {/* Modal: Edit Store Status / Commission */}
-      <Modal visible={!!editStoreModal} animationType="fade" transparent>
-        <View className="flex-1 bg-black/60 justify-center items-center px-6">
-          <View className="bg-white rounded-3xl p-6 w-full max-w-sm items-center shadow-2xl">
-            <Text className="text-2xl mb-1">⚙️</Text>
-            <Text className="text-xl font-quicksand-bold text-dark-100 mb-1">
-              Store Control
-            </Text>
-            <Text className="text-gray-400 font-quicksand-medium text-xs text-center mb-2">
-              Manage status & commission for {editStoreModal?.storeName}
-            </Text>
-            <View className="bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-full mb-4">
-              <Text className="text-primary font-quicksand-bold text-[10px]">
-                🌐 All Categories Enabled for Seller
-              </Text>
-            </View>
-
-            <Text className="self-start font-quicksand-bold text-xs text-gray-500 mb-1">
-              Commission Percentage (%)
-            </Text>
-            <TextInput
-              keyboardType="numeric"
-              value={commissionRate}
-              onChangeText={setCommissionRate}
-              className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-center text-lg font-bold mb-4"
-            />
-
-            <View className="w-full gap-2 mb-4">
+      {/* Modal: Admin Edit Store Profile, Pictures & Status */}
+      <Modal visible={!!editStoreModal} animationType="slide" transparent>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          className="flex-1 justify-end bg-black/60"
+        >
+          <View className="bg-white rounded-t-[36px] p-6 max-h-[90%] shadow-2xl">
+            <View className="flex-row justify-between items-center mb-4 border-b border-gray-100 pb-3">
+              <View>
+                <Text className="text-xl font-quicksand-bold text-dark-100">
+                  Edit Store Profile & Media
+                </Text>
+                <Text className="text-xs text-primary font-quicksand-semibold">
+                  Admin Control Panel
+                </Text>
+              </View>
               <TouchableOpacity
-                onPress={() => handleUpdateStore('active')}
-                className="bg-green-500/10 border border-green-500/30 py-3 rounded-2xl items-center"
+                onPress={() => setEditStoreModal(null)}
+                className="px-3 py-1 bg-primary/10 border border-primary/20 rounded-xl"
               >
-                <Text className="text-green-700 font-quicksand-bold">Set Active 🟢</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => handleUpdateStore('suspended')}
-                className="bg-red-500/10 border border-red-500/30 py-3 rounded-2xl items-center"
-              >
-                <Text className="text-red-700 font-quicksand-bold">Suspend Store 🛑</Text>
+                <Text className="text-primary font-quicksand-bold text-xs">Close</Text>
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              onPress={() => setEditStoreModal(null)}
-              className="bg-gray-200 py-3 px-6 rounded-full w-full items-center"
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: 160 }}
             >
-              <Text className="text-gray-700 font-quicksand-bold">Close</Text>
-            </TouchableOpacity>
+              {/* Store Hero Banner Picker */}
+              <Text className="font-quicksand-bold text-sm text-dark-100 mb-1.5">
+                Store Hero Banner Image
+              </Text>
+              <TouchableOpacity
+                onPress={handlePickEditBanner}
+                activeOpacity={0.8}
+                className="w-full h-36 bg-gray-100 rounded-2xl overflow-hidden border-2 border-dashed border-primary/20 mb-5 relative items-center justify-center"
+              >
+                {editBannerUrl ? (
+                  <FastImage source={editBannerUrl} className="w-full h-full" contentFit="cover" />
+                ) : (
+                  <View className="items-center">
+                    <Text className="text-2xl mb-1">🖼️</Text>
+                    <Text className="text-xs font-quicksand-bold text-primary">Upload Store Banner</Text>
+                  </View>
+                )}
+                <View className="absolute bottom-2 right-2 bg-black/60 px-2.5 py-1 rounded-full border border-white/30">
+                  <Text className="text-[10px] text-white font-quicksand-bold">📷 Change Banner</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Store Profile Logo Picture Picker */}
+              <Text className="font-quicksand-bold text-sm text-dark-100 mb-1.5">
+                Store Profile / Logo Picture
+              </Text>
+              <View className="flex-row items-center mb-5">
+                <TouchableOpacity
+                  onPress={handlePickEditLogo}
+                  activeOpacity={0.8}
+                  className="w-20 h-20 bg-gray-100 rounded-2xl overflow-hidden border-2 border-dashed border-primary/30 mr-4 relative items-center justify-center"
+                >
+                  {editLogoUrl ? (
+                    <FastImage source={editLogoUrl} className="w-full h-full" contentFit="cover" />
+                  ) : (
+                    <Text className="text-2xl">🏪</Text>
+                  )}
+                  <View className="absolute inset-0 bg-black/20 items-center justify-center">
+                    <Text className="text-[10px] text-white font-bold">📷 Edit</Text>
+                  </View>
+                </TouchableOpacity>
+
+                <View className="flex-1">
+                  <TouchableOpacity
+                    onPress={handlePickEditLogo}
+                    className="bg-primary/10 border border-primary/20 px-4 py-2.5 rounded-xl self-start mb-1"
+                  >
+                    <Text className="text-primary font-quicksand-bold text-xs">📷 Pick Profile Logo</Text>
+                  </TouchableOpacity>
+                  <Text className="text-[11px] text-gray-400 font-quicksand-medium">
+                    This logo appears on store cards and the store details page.
+                  </Text>
+                </View>
+              </View>
+
+              {/* Store Details Fields */}
+              <Text className="font-quicksand-bold text-sm text-dark-100 mb-1">
+                Store Name *
+              </Text>
+              <TextInput
+                value={editStoreName}
+                onChangeText={setEditStoreName}
+                placeholder="Store Name"
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 font-quicksand-semibold mb-4 text-dark-100"
+              />
+
+              <Text className="font-quicksand-bold text-sm text-dark-100 mb-1">
+                Store Description
+              </Text>
+              <TextInput
+                multiline
+                numberOfLines={3}
+                value={editDescription}
+                onChangeText={setEditDescription}
+                placeholder="Quality grocery & daily essentials store..."
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 font-quicksand-semibold mb-4 min-h-[70px] text-dark-100"
+              />
+
+              <View className="flex-row gap-3 mb-4">
+                <View className="flex-1">
+                  <View className="flex-row items-center justify-between mb-1">
+                    <Text className="font-quicksand-bold text-xs text-dark-100">
+                      Store Address *
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setStoreMapPickerVisible(true)}
+                      className="bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-lg flex-row items-center active:opacity-80"
+                    >
+                      <Text className="text-[10px] font-quicksand-bold text-primary">📍 Map Pin</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <TextInput
+                    value={editAddress}
+                    onChangeText={setEditAddress}
+                    placeholder="Physical address"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-3 py-3 font-quicksand-semibold text-xs text-dark-100"
+                  />
+                  {editLatitude && editLongitude ? (
+                    <Text className="text-[10px] text-green-600 font-quicksand-bold mt-1">
+                      ✓ Map Pin Set ({editLatitude.toFixed(4)}, {editLongitude.toFixed(4)})
+                    </Text>
+                  ) : null}
+                </View>
+
+                <View className="flex-1">
+                  <Text className="font-quicksand-bold text-xs text-dark-100 mb-1">
+                    Phone Number
+                  </Text>
+                  <TextInput
+                    keyboardType="phone-pad"
+                    value={editPhone}
+                    onChangeText={setEditPhone}
+                    placeholder="+234..."
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-3 py-3 font-quicksand-semibold text-xs text-dark-100"
+                  />
+                </View>
+              </View>
+
+              <View className="flex-row gap-3 mb-5">
+                <View className="flex-1">
+                  <Text className="font-quicksand-bold text-xs text-dark-100 mb-1">
+                    Commission Rate (%)
+                  </Text>
+                  <TextInput
+                    keyboardType="numeric"
+                    value={editCommissionRate}
+                    onChangeText={setEditCommissionRate}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-3 py-3 font-quicksand-bold text-primary text-xs"
+                  />
+                </View>
+
+                <View className="flex-1">
+                  <Text className="font-quicksand-bold text-xs text-dark-100 mb-1">
+                    Store Status
+                  </Text>
+                  <View className="flex-row gap-1">
+                    <TouchableOpacity
+                      onPress={() => setEditStatus('active')}
+                      className={`flex-1 py-2.5 rounded-xl border items-center ${editStatus === 'active' ? 'bg-green-500 border-green-500' : 'bg-gray-50 border-gray-200'
+                        }`}
+                    >
+                      <Text className={`font-quicksand-bold text-xs ${editStatus === 'active' ? 'text-white' : 'text-gray-600'}`}>
+                        🟢 Active
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => setEditStatus('suspended')}
+                      className={`flex-1 py-2.5 rounded-xl border items-center ${editStatus === 'suspended' ? 'bg-red-500 border-red-500' : 'bg-gray-50 border-gray-200'
+                        }`}
+                    >
+                      <Text className={`font-quicksand-bold text-xs ${editStatus === 'suspended' ? 'text-white' : 'text-gray-600'}`}>
+                        🛑 Suspend
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                onPress={handleSaveStoreDetails}
+                disabled={savingStore}
+                className="bg-primary py-4 rounded-2xl items-center shadow-lg shadow-primary/30"
+              >
+                {savingStore ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text className="text-white font-quicksand-bold text-base">
+                    Save Store Profile & Pictures 💾
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Modal: Payout Settlement */}
       <Modal visible={!!payoutModalStore} animationType="slide" transparent>
-        <View className="flex-1 bg-black/60 justify-end">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          className="flex-1 justify-end bg-black/60"
+        >
           <View className="bg-white rounded-t-[36px] p-6 max-h-[85%] shadow-2xl">
             <View className="flex-row justify-between items-center mb-4">
               <View>
@@ -438,7 +704,7 @@ export default function AdminSellers() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 100 }}>
               <View className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-4">
                 <Text className="text-xs font-quicksand-medium text-gray-500 mb-1">
                   Configured Store Commission Rate:
@@ -499,8 +765,19 @@ export default function AdminSellers() {
               )}
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
+
+      <LocationPickerModal
+        visible={storeMapPickerVisible}
+        onClose={() => setStoreMapPickerVisible(false)}
+        titleNote="Pin Store Location on Map"
+        onSelectLocation={(loc) => {
+          setEditAddress(loc.address)
+          setEditLatitude(loc.latitude)
+          setEditLongitude(loc.longitude)
+        }}
+      />
     </SafeAreaView>
   )
 }

@@ -100,7 +100,7 @@ export default function AdminPagesManager() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
       {/* Header Bar */}
       <View className="px-5 pt-4 pb-3 bg-white border-b border-gray-200 flex-row items-center justify-between">
         <TouchableOpacity

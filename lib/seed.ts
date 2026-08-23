@@ -19,8 +19,6 @@ interface MenuItem {
   image_url: string
   price: number
   rating: number
-  calories: number
-  protein: number
   category_name: string
   customizations: string[]
 }
@@ -88,8 +86,6 @@ async function seed() {
         image_url: item.image_url,
         price: item.price,
         rating: item.rating,
-        calories: item.calories,
-        protein: item.protein,
         categories: categoryMap[item.category_name],
       },
     )

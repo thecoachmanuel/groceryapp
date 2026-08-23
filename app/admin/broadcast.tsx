@@ -1,3 +1,7 @@
+import { images } from '@/constants'
+import useNotificationStore from '@/store/notification.store'
+import { UserRole } from '@/type'
+import { useRouter } from 'expo-router'
 import React, { useState } from 'react'
 import {
   ActivityIndicator,
@@ -13,10 +17,6 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
-import useNotificationStore from '@/store/notification.store'
-import { images } from '@/constants'
-import { UserRole } from '@/type'
 
 const PRESET_BROADCASTS = [
   {
@@ -90,10 +90,9 @@ export default function AdminBroadcastScreen() {
 
       Alert.alert(
         'Broadcast Dispatched 🚀',
-        `Notification sent successfully to ${
-          targetRole === 'all'
-            ? 'All Users (Customers & Sellers)'
-            : targetRole === 'customer'
+        `Notification sent successfully to ${targetRole === 'all'
+          ? 'All Users (Customers & Sellers)'
+          : targetRole === 'customer'
             ? 'All Customers'
             : 'All Sellers'
         }!`,
@@ -117,8 +116,8 @@ export default function AdminBroadcastScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
-      <StatusBar barStyle="dark-content" backgroundColor="#E6F7EC" />
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Header Bar */}
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -237,16 +236,14 @@ export default function AdminBroadcastScreen() {
                 <TouchableOpacity
                   key={opt.value}
                   onPress={() => setTargetRole(opt.value)}
-                  className={`flex-1 py-3 rounded-2xl items-center border-2 ${
-                    isSelected
+                  className={`flex-1 py-3 rounded-2xl items-center border-2 ${isSelected
                       ? 'bg-primary border-primary shadow-sm shadow-primary/20'
                       : 'bg-gray-50 border-gray-200'
-                  }`}
+                    }`}
                 >
                   <Text
-                    className={`font-quicksand-bold text-xs ${
-                      isSelected ? 'text-white' : 'text-gray-700'
-                    }`}
+                    className={`font-quicksand-bold text-xs ${isSelected ? 'text-white' : 'text-gray-700'
+                      }`}
                   >
                     {opt.label}
                   </Text>
@@ -272,16 +269,14 @@ export default function AdminBroadcastScreen() {
                 <TouchableOpacity
                   key={opt.value}
                   onPress={() => setNotifType(opt.value)}
-                  className={`flex-1 py-2.5 rounded-2xl items-center border-2 ${
-                    isSelected
+                  className={`flex-1 py-2.5 rounded-2xl items-center border-2 ${isSelected
                       ? 'bg-primary/15 border-primary'
                       : 'bg-gray-50 border-gray-200'
-                  }`}
+                    }`}
                 >
                   <Text
-                    className={`font-quicksand-bold text-xs ${
-                      isSelected ? 'text-primary' : 'text-gray-600'
-                    }`}
+                    className={`font-quicksand-bold text-xs ${isSelected ? 'text-primary' : 'text-gray-600'
+                      }`}
                   >
                     {opt.label}
                   </Text>

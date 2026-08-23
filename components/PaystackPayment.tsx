@@ -11,7 +11,7 @@
  *   />
  */
 
-import React, { useRef } from 'react'
+import React, { useMemo, useRef } from 'react'
 import { Modal, View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { WebView } from 'react-native-webview'
@@ -39,23 +39,35 @@ export function PaystackPayment({
   onCancel,
   metadata = {},
 }: PaystackPaymentProps) {
-  const ref = reference || `TX_${Date.now()}_${Math.floor(Math.random() * 100000)}`
-  const amountKobo = Math.round(amount * 100)
+  // Lock transaction reference per active payment session to prevent HTML re-generation & WebView reload flickering
+  const sessionRef = useRef<string>('')
+  if (visible && !sessionRef.current) {
+    sessionRef.current = reference || `TX_${Date.now()}_${Math.floor(Math.random() * 100000)}`
+  } else if (!visible && sessionRef.current) {
+    sessionRef.current = ''
+  }
 
-  // Build inline HTML that loads Paystack Inline JS
-  const html = `
+  const activeRef = sessionRef.current || reference || `TX_${Date.now()}`
+
+  // Build frozen inline HTML string that loads Paystack Inline JS without re-rendering on parent state changes
+  const html = useMemo(() => {
+    if (!visible) return ''
+    const amountKobo = Math.round((amount || 0) * 100)
+    const firstName = (name || email || 'Customer').split(' ')[0]
+
+    return `
 <!DOCTYPE html>
 <html>
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-    #msg { font-family: sans-serif; color: #555; font-size: 15px; }
+    body { background: #ffffff; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    #msg { color: #53B175; font-size: 15px; font-weight: 600; text-align: center; }
   </style>
 </head>
 <body>
-  <p id="msg">Initializing payment…</p>
+  <p id="msg">🔒 Initializing Paystack Checkout…</p>
   <script src="https://js.paystack.co/v1/inline.js"></script>
   <script>
     window.onload = function() {
@@ -65,8 +77,8 @@ export function PaystackPayment({
           email: '${email}',
           amount: ${amountKobo},
           currency: 'NGN',
-          ref: '${ref}',
-          firstname: '${(name || email).split(' ')[0]}',
+          ref: '${activeRef}',
+          firstname: '${firstName}',
           metadata: ${JSON.stringify(metadata)},
           callback: function(response) {
             window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'success', reference: response.reference }));
@@ -77,7 +89,7 @@ export function PaystackPayment({
         });
         handler.openIframe();
       } catch(e) {
-        document.getElementById('msg').innerText = 'Payment error: ' + e.message;
+        document.getElementById('msg').innerText = 'Payment initialization error: ' + e.message;
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', message: e.message }));
       }
     };
@@ -85,12 +97,13 @@ export function PaystackPayment({
 </body>
 </html>
 `
+  }, [visible, amount, email, name, activeRef, metadata])
 
   const handleMessage = (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data)
       if (data.type === 'success') {
-        onSuccess(data.reference || ref)
+        onSuccess(data.reference || activeRef)
       } else if (data.type === 'cancel' || data.type === 'error') {
         onCancel()
       }
@@ -120,7 +133,7 @@ export function PaystackPayment({
           startInLoadingState
           renderLoading={() => (
             <View style={styles.loading}>
-              <ActivityIndicator size="large" color="#16A34A" />
+              <ActivityIndicator size="large" color="#53B175" />
               <Text style={styles.loadingText}>Loading Payment Gateway…</Text>
             </View>
           )}

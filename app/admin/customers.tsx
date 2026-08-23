@@ -1,3 +1,13 @@
+import { images } from '@/constants'
+import {
+  creditCustomerWallet,
+  debitCustomerWallet,
+  getAllCustomers,
+  getCustomerWallet,
+  getWalletTransactions,
+  updateUserAccountStatus,
+} from '@/lib/appwrite'
+import { useRouter } from 'expo-router'
 import React, { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
@@ -15,16 +25,6 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
-import {
-  getAllCustomers,
-  updateUserAccountStatus,
-  getCustomerWallet,
-  creditCustomerWallet,
-  debitCustomerWallet,
-  getWalletTransactions,
-} from '@/lib/appwrite'
-import { images } from '@/constants'
 
 export default function AdminCustomersScreen() {
   const router = useRouter()
@@ -173,8 +173,8 @@ export default function AdminCustomersScreen() {
   )
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
-      <StatusBar barStyle="dark-content" backgroundColor="#E6F7EC" />
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Header */}
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -212,7 +212,7 @@ export default function AdminCustomersScreen() {
 
       {loading ? (
         <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color="#16A34A" />
+          <ActivityIndicator size="large" color="#53B175" />
         </View>
       ) : (
         <FlatList
@@ -223,7 +223,7 @@ export default function AdminCustomersScreen() {
           keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => {
             const isSuspended = item.status === 'suspended'
-            const currentBal = walletBalances[item.$id] ?? (item.walletBalance || 0)
+            const currentBal = walletBalances[item.$id] ?? walletBalances[item.accountId] ?? walletBalances[item.email] ?? (item.walletBalance || 0)
 
             return (
               <View className="bg-white rounded-[28px] p-5 border-2 border-primary/10 shadow-lg shadow-black/10">
@@ -238,16 +238,14 @@ export default function AdminCustomersScreen() {
                   </View>
 
                   <View
-                    className={`px-3 py-1 rounded-full border ${
-                      isSuspended
+                    className={`px-3 py-1 rounded-full border ${isSuspended
                         ? 'bg-red-500/10 border-red-500/20'
                         : 'bg-green-500/10 border-green-500/20'
-                    }`}
+                      }`}
                   >
                     <Text
-                      className={`font-quicksand-bold text-xs capitalize ${
-                        isSuspended ? 'text-red-600' : 'text-green-700'
-                      }`}
+                      className={`font-quicksand-bold text-xs capitalize ${isSuspended ? 'text-red-600' : 'text-green-700'
+                        }`}
                     >
                       {item.status || 'active'}
                     </Text>
@@ -288,16 +286,14 @@ export default function AdminCustomersScreen() {
 
                   <TouchableOpacity
                     onPress={() => handleToggleStatus(item)}
-                    className={`px-3 py-1.5 rounded-xl border ${
-                      isSuspended
+                    className={`px-3 py-1.5 rounded-xl border ${isSuspended
                         ? 'bg-green-500/10 border-green-500/30'
                         : 'bg-red-500/10 border-red-500/30'
-                    }`}
+                      }`}
                   >
                     <Text
-                      className={`font-quicksand-bold text-xs ${
-                        isSuspended ? 'text-green-700' : 'text-red-600'
-                      }`}
+                      className={`font-quicksand-bold text-xs ${isSuspended ? 'text-green-700' : 'text-red-600'
+                        }`}
                     >
                       {isSuspended ? 'Activate Account' : 'Suspend Account'}
                     </Text>
@@ -454,11 +450,10 @@ export default function AdminCustomersScreen() {
                           </Text>
                         </View>
                         <Text
-                          className={`font-quicksand-bold text-sm ${
-                            tx.type === 'deposit' || tx.type === 'refund' || tx.type === 'admin_adjustment'
+                          className={`font-quicksand-bold text-sm ${tx.type === 'deposit' || tx.type === 'refund' || tx.type === 'admin_adjustment'
                               ? 'text-primary'
                               : 'text-red-500'
-                          }`}
+                            }`}
                         >
                           {tx.type === 'payment' ? '-' : '+'}₦{Number(tx.amount).toLocaleString()}
                         </Text>

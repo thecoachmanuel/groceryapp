@@ -83,7 +83,7 @@ export default function OnboardingScreen() {
           <View
             key={i}
             className={`h-1.5 rounded-full ${
-              i === index ? 'w-6 bg-gray-900' : 'w-1.5 bg-gray-200'
+              i === index ? 'w-6 bg-primary' : 'w-1.5 bg-gray-200'
             }`}
           />
         ))}
@@ -91,7 +91,7 @@ export default function OnboardingScreen() {
 
       {/* Text block */}
       <View className="items-center gap-2 px-4">
-        <Text className="text-2xl font-quicksand-bold text-center text-gray-900">
+        <Text className="text-2xl font-quicksand-bold text-center text-dark-100">
           {item.title}
         </Text>
         <Text className="text-sm font-quicksand-medium text-center text-gray-500 leading-6">
@@ -132,7 +132,7 @@ export default function OnboardingScreen() {
             <TouchableOpacity
               onPress={handleComplete}
               activeOpacity={0.8}
-              className="w-11 h-11 rounded-2xl bg-gray-900 items-center justify-center shadow-md"
+              className="w-11 h-11 rounded-2xl bg-primary items-center justify-center shadow-md shadow-primary/30"
             >
               <Ionicons name="checkmark" color="#ffffff" size={20} />
             </TouchableOpacity>
@@ -140,7 +140,7 @@ export default function OnboardingScreen() {
             <TouchableOpacity
               onPress={handleNext}
               activeOpacity={0.8}
-              className="w-11 h-11 rounded-2xl bg-gray-900 items-center justify-center shadow-md"
+              className="w-11 h-11 rounded-2xl bg-primary items-center justify-center shadow-md shadow-primary/30"
             >
               <Ionicons name="arrow-forward" color="#ffffff" size={20} />
             </TouchableOpacity>

@@ -136,11 +136,11 @@ export default function NotificationsScreen() {
   }
 
   return (
-    <View className="flex-1 bg-bg-light">
-      <StatusBar barStyle="light-content" backgroundColor="#16A34A" />
+    <View className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
+      <StatusBar barStyle="light-content" backgroundColor="#53B175" />
 
       {/* Header Banner spanning into status bar */}
-      <SafeAreaView edges={['top']} className="bg-primary rounded-b-[40px] shadow-lg shadow-primary/30">
+      <SafeAreaView edges={['top']} className="bg-primary rounded-b-[40px] shadow-lg shadow-primary/30" style={{ backgroundColor: '#53B175' }}>
         <View className="px-6 pt-3 pb-8">
           <View className="flex-row justify-between items-center mb-3">
             <View className="flex-row items-center bg-white/20 px-3 py-1 rounded-full">
@@ -203,6 +203,11 @@ export default function NotificationsScreen() {
                   ? 'bg-primary border-primary'
                   : 'bg-white border-primary/10'
                   }`}
+                style={
+                  isSelected
+                    ? { backgroundColor: '#53B175', borderColor: '#53B175' }
+                    : { backgroundColor: '#ffffff', borderColor: 'rgba(83, 177, 117, 0.2)' }
+                }
               >
                 <Text
                   className={`font-quicksand-bold text-xs ${isSelected ? 'text-white' : 'text-dark-100'
@@ -222,13 +227,13 @@ export default function NotificationsScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 20, paddingBottom: 130 }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#16A34A']} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#53B175']} />
         }
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={() => (
           <View className="items-center mt-12 px-8">
             <View className="bg-white border-2 border-primary/15 rounded-[36px] px-8 py-10 items-center shadow-lg shadow-black/5 w-full">
-              <View className="w-16 h-16 bg-primary/10 rounded-2xl items-center justify-center mb-3 border border-primary/20">
+              <View className="w-16 h-16 bg-primary/10 rounded-2xl items-center justify-center mb-3 border border-primary/20" style={{ backgroundColor: 'rgba(83, 177, 117, 0.1)', borderColor: 'rgba(83, 177, 117, 0.2)' }}>
                 <Text className="text-3xl">📭</Text>
               </View>
               <Text className="text-dark-100 text-lg font-quicksand-bold">
@@ -250,8 +255,13 @@ export default function NotificationsScreen() {
               onPress={() => handleNotificationPress(item)}
               className={`rounded-[26px] p-4 mb-3 border-2 shadow-sm ${item.read
                 ? 'bg-white border-primary/10'
-                : 'bg-green-50/50 border-primary/30 shadow-primary/10'
+                : 'border-primary/30 shadow-primary/10'
                 }`}
+              style={
+                item.read
+                  ? { backgroundColor: '#ffffff', borderColor: 'rgba(83, 177, 117, 0.15)' }
+                  : { backgroundColor: 'rgba(83, 177, 117, 0.06)', borderColor: 'rgba(83, 177, 117, 0.35)' }
+              }
             >
               <View className="flex-row items-start">
                 <View className={`w-11 h-11 rounded-2xl ${meta.bg} border ${meta.border} items-center justify-center mr-3 mt-0.5`}>
@@ -282,7 +292,7 @@ export default function NotificationsScreen() {
                     </View>
 
                     {item.orderId ? (
-                      <Text className="text-[11px] font-quicksand-bold text-primary">
+                      <Text className="text-[11px] font-quicksand-bold text-primary" style={{ color: '#53B175' }}>
                         View Details →
                       </Text>
                     ) : item.type === 'promo' ? (
@@ -294,7 +304,7 @@ export default function NotificationsScreen() {
                 </View>
 
                 {!item.read && (
-                  <View className="w-2.5 h-2.5 bg-primary rounded-full mt-1.5" />
+                  <View className="w-2.5 h-2.5 bg-primary rounded-full mt-1.5" style={{ backgroundColor: '#53B175' }} />
                 )}
               </View>
             </TouchableOpacity>

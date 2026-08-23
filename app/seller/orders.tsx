@@ -69,7 +69,7 @@ export default function SellerOrders() {
   )
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
       {/* Header */}
       <View className="px-5 pt-4 pb-3 flex-row justify-between items-center bg-white border-b border-primary/10">
         <TouchableOpacity
@@ -121,7 +121,7 @@ export default function SellerOrders() {
 
       {loading ? (
         <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color="#16A34A" />
+          <ActivityIndicator size="large" color="#53B175" />
         </View>
       ) : (
         <FlatList
@@ -129,7 +129,7 @@ export default function SellerOrders() {
           keyExtractor={(item) => item.$id}
           contentContainerClassName="p-5 pb-32"
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#16A34A']} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#53B175']} />
           }
           ListEmptyComponent={() => (
             <View className="items-center mt-20">

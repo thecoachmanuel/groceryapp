@@ -1,3 +1,6 @@
+import LocationPickerModal from '@/components/LocationPickerModal'
+import { images } from '@/constants'
+import { useLocationStore } from '@/store/location.store'
 import React, { useState } from 'react'
 import {
   Alert,
@@ -5,17 +8,13 @@ import {
   Image,
   Keyboard,
   Modal,
-  ScrollView,
   StatusBar,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { SavedAddress, useLocationStore } from '@/store/location.store'
-import LocationPickerModal from '@/components/LocationPickerModal'
-import { images } from '@/constants'
 
 interface AddressManagerModalProps {
   visible: boolean
@@ -98,8 +97,8 @@ export default function AddressManagerModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView className="flex-1 bg-bg-light">
-        <StatusBar barStyle="dark-content" backgroundColor="#E6F7EC" />
+      <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
         {/* Header Bar - Clean header matching My Orders History */}
         <View className="px-5 pt-4 pb-3 flex-row items-center justify-between">
@@ -232,16 +231,14 @@ export default function AddressManagerModal({
                   <TouchableOpacity
                     key={lbl}
                     onPress={() => setSelectedLabel(lbl)}
-                    className={`flex-1 py-2.5 rounded-full items-center border-2 ${
-                      selectedLabel === lbl
+                    className={`flex-1 py-2.5 rounded-full items-center border-2 ${selectedLabel === lbl
                         ? 'bg-primary border-primary'
                         : 'bg-gray-50 border-gray-200'
-                    }`}
+                      }`}
                   >
                     <Text
-                      className={`font-quicksand-bold text-xs ${
-                        selectedLabel === lbl ? 'text-white' : 'text-gray-700'
-                      }`}
+                      className={`font-quicksand-bold text-xs ${selectedLabel === lbl ? 'text-white' : 'text-gray-700'
+                        }`}
                     >
                       {lbl === 'Home' ? '🏠 Home' : lbl === 'Work' ? '💼 Work' : '📍 Other'}
                     </Text>

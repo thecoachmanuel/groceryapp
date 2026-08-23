@@ -31,8 +31,8 @@ export default function ContactScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
-      <StatusBar barStyle="dark-content" backgroundColor="#E6F7EC" />
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Header Bar - Clean header without white rectangle background */}
       <View className="px-5 pt-4 pb-3 flex-row items-center justify-between">
@@ -83,12 +83,12 @@ export default function ContactScreen() {
                 <Text className="text-base font-quicksand-bold text-dark-100 mt-0.5">
                   {supportPhone}
                 </Text>
-                <Text className="text-xs font-quicksand-medium text-primary mt-0.5">
+                <Text className="text-xs font-quicksand-medium text-primary mt-0.5" style={{ color: '#53B175' }}>
                   {supportHours}
                 </Text>
               </View>
             </View>
-            <Text className="text-primary font-bold text-lg">→</Text>
+            <Text className="text-primary font-bold text-lg" style={{ color: '#53B175' }}>→</Text>
           </TouchableOpacity>
 
           {/* Email Support Button */}
@@ -113,7 +113,7 @@ export default function ContactScreen() {
                 </Text>
               </View>
             </View>
-            <Text className="text-primary font-bold text-lg">→</Text>
+            <Text className="text-primary font-bold text-lg" style={{ color: '#53B175' }}>→</Text>
           </TouchableOpacity>
 
           {/* FAQ Navigation Card */}
@@ -138,7 +138,7 @@ export default function ContactScreen() {
                 </Text>
               </View>
             </View>
-            <Text className="text-primary font-bold text-lg">→</Text>
+            <Text className="text-primary font-bold text-lg" style={{ color: '#53B175' }}>→</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

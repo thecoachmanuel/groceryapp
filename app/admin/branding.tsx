@@ -1,3 +1,8 @@
+import { images } from '@/constants'
+import { uploadImageToStorage } from '@/lib/appwrite'
+import useBrandingStore, { DEFAULT_APP_NAME, DEFAULT_APP_TAGLINE } from '@/store/branding.store'
+import * as ImagePicker from 'expo-image-picker'
+import { useRouter } from 'expo-router'
 import React, { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
@@ -13,11 +18,6 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
-import * as ImagePicker from 'expo-image-picker'
-import useBrandingStore, { DEFAULT_APP_NAME, DEFAULT_APP_TAGLINE } from '@/store/branding.store'
-import { uploadImageToStorage } from '@/lib/appwrite'
-import { images } from '@/constants'
 
 const PRESET_ICONS = ['🥦', '🛒', '🥬', '🍎', '🥑', '🧺', '📦', '🍇', '🍋', '🌿', '🍓', '🥕']
 
@@ -119,8 +119,8 @@ export default function AdminBrandingManager() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
-      <StatusBar barStyle="dark-content" backgroundColor="#E6F7EC" />
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Header Bar */}
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -246,7 +246,7 @@ export default function AdminBrandingManager() {
           >
             {uploadingImage ? (
               <View className="flex-row items-center gap-2">
-                <ActivityIndicator size="small" color="#16A34A" />
+                <ActivityIndicator size="small" color="#53B175" />
                 <Text className="text-primary font-quicksand-bold text-sm">Uploading Logo...</Text>
               </View>
             ) : (
@@ -273,11 +273,10 @@ export default function AdminBrandingManager() {
                 <TouchableOpacity
                   key={icon}
                   onPress={() => setLogoUri(icon)}
-                  className={`w-12 h-12 rounded-2xl items-center justify-center border-2 ${
-                    isSelected
+                  className={`w-12 h-12 rounded-2xl items-center justify-center border-2 ${isSelected
                       ? 'bg-primary/20 border-primary'
                       : 'bg-gray-50 border-gray-200'
-                  }`}
+                    }`}
                 >
                   <Text className="text-2xl">{icon}</Text>
                 </TouchableOpacity>

@@ -22,8 +22,8 @@ export default function FAQScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
-      <StatusBar barStyle="dark-content" backgroundColor="#E6F7EC" />
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Header Bar - Clean header without white rectangle background */}
       <View className="px-5 pt-4 pb-3 flex-row items-center justify-between">

@@ -18,13 +18,13 @@ const CartButton = () => {
                 source={images.bag} 
                 className="size-5" 
                 resizeMode="contain" 
-                style={{ tintColor: '#16A34A' }} 
+                style={{ tintColor: '#53B175' }} 
             />
 
             {totalItems > 0 && (
                 <View 
                     className="cart-badge" 
-                    style={{ backgroundColor: '#16A34A' }} 
+                    style={{ backgroundColor: '#53B175' }} 
                 >
                     <Text className="small-bold text-white">
                         {totalItems}

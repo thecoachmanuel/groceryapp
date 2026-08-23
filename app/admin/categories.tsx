@@ -24,6 +24,7 @@ import {
   updateCategory,
   deleteCategory,
   uploadImageToStorage,
+  deleteStorageFileByUrl,
 } from '@/lib/appwrite'
 import { images } from '@/constants'
 import FastImage from '@/components/FastImage'
@@ -162,6 +163,9 @@ export default function AdminCategories() {
       let finalIconUrl = imageUri || ''
 
       if (imageUri && (imageUri.startsWith('file:') || imageUri.startsWith('ph:'))) {
+        if (editingCategory?.iconUrl) {
+          await deleteStorageFileByUrl(editingCategory.iconUrl)
+        }
         finalIconUrl = await uploadImageToStorage(imageUri, 'cat')
       }
 
@@ -177,7 +181,6 @@ export default function AdminCategories() {
         name: categoryName.trim(),
         slug: generatedSlug,
         iconUrl: finalIconUrl,
-        image_url: finalIconUrl,
       }
 
       if (editingCategory) {
@@ -219,7 +222,7 @@ export default function AdminCategories() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
       {/* Top Header */}
       <View className="px-5 pt-4 pb-3 flex-row justify-between items-center bg-white border-b border-primary/10">
         <TouchableOpacity
@@ -304,7 +307,7 @@ export default function AdminCategories() {
       {/* Category List */}
       {loading ? (
         <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color="#16A34A" />
+          <ActivityIndicator size="large" color="#53B175" />
         </View>
       ) : (
         <FlatList

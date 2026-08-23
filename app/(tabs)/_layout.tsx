@@ -5,7 +5,9 @@ import useNotificationStore from '@/store/notification.store'
 import { TabBarIconProps } from '@/type'
 import cn from 'clsx'
 import { Redirect, Tabs } from 'expo-router'
-import { Image, Text, View } from 'react-native'
+import { Image, Platform, Text, View } from 'react-native'
+
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 const TabBarIcon = ({
   focused,
@@ -24,14 +26,14 @@ const TabBarIcon = ({
       <Ionicons
         name={ioniconName}
         size={22}
-        color={focused ? '#16A34A' : '#9CA3AF'}
+        color={focused ? '#53B175' : '#9CA3AF'}
       />
     ) : (
       <Image
         source={icon}
         className="size-6"
         resizeMode="contain"
-        tintColor={focused ? '#16A34A' : '#9CA3AF'}
+        tintColor={focused ? '#53B175' : '#9CA3AF'}
       />
     )}
 
@@ -55,6 +57,7 @@ const TabBarIcon = ({
 )
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets()
   const { isAuthenticated, user, role, sellerStore } = useAuthStore()
   const { getUnreadCount } = useNotificationStore()
 
@@ -64,17 +67,22 @@ export default function TabLayout() {
   const sellerStoreId = sellerStore?.$id || (user as any)?.storeId
   const unreadNotifCount = getUnreadCount(role, currentUserId, sellerStoreId)
 
+  const tabBottomOffset = Platform.OS === 'ios'
+    ? Math.max(insets.bottom || 0, 12)
+    : (insets.bottom > 0 ? insets.bottom : 0)
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
+        sceneStyle: { backgroundColor: '#ffffff' },
         tabBarStyle: {
           borderRadius: 35,
           marginHorizontal: 15,
           height: 70,
           position: 'absolute',
-          bottom: 25,
+          bottom: tabBottomOffset,
           backgroundColor: '#ffffff',
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 10 },

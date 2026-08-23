@@ -4,11 +4,13 @@ import {
   Alert,
   FlatList,
   Image,
+  Keyboard,
   Modal,
   Platform,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native'
 import MapView, { Marker, PROVIDER_DEFAULT, PROVIDER_GOOGLE } from 'react-native-maps'
@@ -23,6 +25,7 @@ interface LocationPickerModalProps {
   visible: boolean
   onClose: () => void
   titleNote?: string
+  onSelectLocation?: (location: { address: string; latitude: number; longitude: number }) => void
 }
 
 class MapErrorBoundary extends React.Component<
@@ -66,6 +69,7 @@ export default function LocationPickerModal({
   visible,
   onClose,
   titleNote,
+  onSelectLocation,
 }: LocationPickerModalProps) {
   const { address, latitude, longitude, setLocation } = useLocationStore()
 
@@ -269,7 +273,15 @@ export default function LocationPickerModal({
   }
 
   const handleConfirm = () => {
-    setLocation(selectedAddress, currentCoords, true)
+    if (onSelectLocation) {
+      onSelectLocation({
+        address: selectedAddress,
+        latitude: currentCoords.latitude,
+        longitude: currentCoords.longitude,
+      })
+    } else {
+      setLocation(selectedAddress, currentCoords, true)
+    }
     onClose()
   }
 
@@ -288,166 +300,167 @@ export default function LocationPickerModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View className="flex-1 bg-white">
-        {/* Header Bar */}
-        <View className="pt-12 pb-3 px-5 border-b-2 border-primary/10 flex-row items-center justify-between bg-white z-10">
-          <TouchableOpacity onPress={onClose} activeOpacity={0.7} className="p-1">
-            <Image source={images.arrowBack} className="size-5" resizeMode="contain" />
-          </TouchableOpacity>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View className="flex-1 bg-white">
+          {/* Header Bar */}
+          <View className="pt-12 pb-3 px-5 border-b-2 border-primary/10 flex-row items-center justify-between bg-white z-10">
+            <TouchableOpacity onPress={onClose} activeOpacity={0.7} className="p-1">
+              <Image source={images.arrowBack} className="size-5" resizeMode="contain" />
+            </TouchableOpacity>
 
-          <View className="items-center flex-1 mx-3">
-            <Text className="text-lg font-quicksand-bold text-dark-100">
-              Select Delivery Location
-            </Text>
-            {titleNote ? (
-              <Text className="text-xs font-quicksand-medium text-primary">{titleNote}</Text>
-            ) : (
-              <Text className="text-xs font-quicksand-medium text-gray-400">
-                Search or drag pin on map
+            <View className="items-center flex-1 mx-3">
+              <Text className="text-lg font-quicksand-bold text-dark-100">
+                Select Delivery Location
               </Text>
-            )}
-          </View>
-
-          <View className="size-5" />
-        </View>
-
-        {/* Search Bar Input */}
-        <View className="p-4 bg-white z-20 shadow-sm border-b-2 border-primary/10">
-          <View className="flex-row items-center bg-white border-2 border-primary/10 rounded-full px-4 py-2.5 shadow-md shadow-black/10">
-            <Text className="text-base mr-2">🔍</Text>
-            <TextInput
-              placeholder="Search street, area, city or landmark..."
-              value={search}
-              onChangeText={setSearch}
-              placeholderTextColor="#9CA3AF"
-              className="flex-1 font-quicksand-semibold text-sm text-dark-100"
-            />
-            {isSearching && <ActivityIndicator size="small" color="#16A34A" />}
-            {search.length > 0 && !isSearching && (
-              <TouchableOpacity onPress={() => setSearch('')}>
-                <Text className="text-gray-400 font-bold px-2">✕</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Autocomplete Predictions List */}
-          {predictions.length > 0 && (
-            <View className="bg-white rounded-3xl mt-2 border-2 border-primary/10 max-h-48 shadow-xl">
-              <FlatList
-                data={predictions}
-                keyExtractor={(_, index) => index.toString()}
-                keyboardShouldPersistTaps="handled"
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    onPress={() => handleSelectPrediction(item)}
-                    className="p-3.5 border-b border-gray-100 flex-row items-center"
-                  >
-                    <Text className="text-base mr-2">📍</Text>
-                    <Text className="flex-1 font-quicksand-medium text-xs text-dark-100">
-                      {item.display_name}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              />
-            </View>
-          )}
-        </View>
-
-        {/* Interactive Map View with ErrorBoundary */}
-        <View className="flex-1 relative bg-gray-100">
-          <MapErrorBoundary>
-            <MapView
-              ref={mapRef}
-              style={{ width: '100%', height: '100%' }}
-              provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
-              initialRegion={{
-                latitude: currentCoords.latitude,
-                longitude: currentCoords.longitude,
-                latitudeDelta: 0.008,
-                longitudeDelta: 0.008,
-              }}
-              onPress={(e) => handleMarkerDragEnd(e)}
-            >
-              <Marker
-                coordinate={currentCoords}
-                draggable
-                onDragEnd={handleMarkerDragEnd}
-                title="Delivery Location"
-                description={selectedAddress}
-              />
-            </MapView>
-          </MapErrorBoundary>
-
-          {/* GPS Locate Button Overlay */}
-          <TouchableOpacity
-            onPress={fetchGPSLocation}
-            disabled={isLocatingUser}
-            className="absolute bottom-4 right-4 bg-white p-3.5 rounded-full shadow-lg border-2 border-primary/10 flex-row items-center justify-center active:opacity-80 z-10"
-          >
-            {isLocatingUser ? (
-              <ActivityIndicator size="small" color="#16A34A" />
-            ) : (
-              <Text className="text-lg">🎯</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Selected Address Preview & Confirm Bar */}
-        <View className="p-5 bg-white border-t-2 border-primary/10 shadow-2xl">
-          <View className="flex-row items-start mb-3">
-            <View className="w-9 h-9 rounded-full bg-primary/10 items-center justify-center mr-3 mt-0.5 border border-primary/20">
-              <Text className="text-base">📍</Text>
-            </View>
-            <View className="flex-1">
-              <Text className="text-xs font-quicksand-semibold text-gray-400 uppercase tracking-wider">
-                Selected Address
-              </Text>
-              {isGeocoding ? (
-                <View className="flex-row items-center mt-1">
-                  <ActivityIndicator size="small" color="#16A34A" className="mr-2" />
-                  <Text className="text-gray-400 font-quicksand-medium text-sm">
-                    Fetching address details...
-                  </Text>
-                </View>
+              {titleNote ? (
+                <Text className="text-xs font-quicksand-medium text-primary">{titleNote}</Text>
               ) : (
-                <Text
-                  className="text-sm font-quicksand-bold text-dark-100 mt-0.5"
-                  numberOfLines={2}
-                >
-                  {selectedAddress}
+                <Text className="text-xs font-quicksand-medium text-gray-400">
+                  Search or drag pin on map
                 </Text>
               )}
             </View>
+
+            <View className="size-5" />
           </View>
 
-          {/* Quick Save Buttons */}
-          <View className="flex-row gap-2 mb-3">
-            <TouchableOpacity
-              onPress={() => handleSaveAsLabel('Home')}
-              className="flex-1 bg-primary/10 border border-primary/30 py-2.5 rounded-full items-center"
-            >
-              <Text className="text-primary font-quicksand-bold text-xs">🏠 Save as Home</Text>
-            </TouchableOpacity>
+          {/* Search Bar Input */}
+          <View className="p-4 bg-white z-20 shadow-sm border-b-2 border-primary/10">
+            <View className="flex-row items-center bg-white border-2 border-primary/10 rounded-full px-4 py-2.5 shadow-md shadow-black/10">
+              <Text className="text-base mr-2">🔍</Text>
+              <TextInput
+                placeholder="Search street, area, city or landmark..."
+                value={search}
+                onChangeText={setSearch}
+                placeholderTextColor="#9CA3AF"
+                className="flex-1 font-quicksand-semibold text-sm text-dark-100"
+              />
+              {isSearching && <ActivityIndicator size="small" color="#53B175" />}
+              {search.length > 0 && !isSearching && (
+                <TouchableOpacity onPress={() => setSearch('')}>
+                  <Text className="text-gray-400 font-bold px-2">✕</Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
+            {/* Autocomplete Predictions List */}
+            {predictions.length > 0 && (
+              <View className="bg-white rounded-3xl mt-2 border-2 border-primary/10 max-h-48 shadow-xl">
+                <FlatList
+                  data={predictions}
+                  keyExtractor={(_, index) => index.toString()}
+                  keyboardShouldPersistTaps="handled"
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      onPress={() => handleSelectPrediction(item)}
+                      className="p-3.5 border-b border-gray-100 flex-row items-center"
+                    >
+                      <Text className="text-base mr-2">📍</Text>
+                      <Text className="flex-1 font-quicksand-medium text-xs text-dark-100">
+                        {item.display_name}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+            )}
+          </View>
+
+          {/* Interactive Map View with ErrorBoundary */}
+          <View className="flex-1 relative bg-gray-100">
+            <MapErrorBoundary>
+              <MapView
+                ref={mapRef}
+                style={{ width: '100%', height: '100%' }}
+                provider={PROVIDER_DEFAULT}
+                initialRegion={{
+                  latitude: currentCoords.latitude,
+                  longitude: currentCoords.longitude,
+                  latitudeDelta: 0.008,
+                  longitudeDelta: 0.008,
+                }}
+                onPress={(e) => handleMarkerDragEnd(e)}
+              >
+                <Marker
+                  coordinate={currentCoords}
+                  draggable
+                  onDragEnd={handleMarkerDragEnd}
+                  title="Delivery Location"
+                  description={selectedAddress}
+                />
+              </MapView>
+            </MapErrorBoundary>
+
+            {/* GPS Locate Button Overlay */}
             <TouchableOpacity
-              onPress={() => handleSaveAsLabel('Work')}
-              className="flex-1 bg-primary/10 border border-primary/30 py-2.5 rounded-full items-center"
+              onPress={fetchGPSLocation}
+              disabled={isLocatingUser}
+              className="absolute bottom-4 right-4 bg-white p-3.5 rounded-full shadow-lg border-2 border-primary/10 flex-row items-center justify-center active:opacity-80 z-10"
             >
-              <Text className="text-primary font-quicksand-bold text-xs">💼 Save as Work</Text>
+              {isLocatingUser ? (
+                <ActivityIndicator size="small" color="#53B175" />
+              ) : (
+                <Text className="text-lg">🎯</Text>
+              )}
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            onPress={handleConfirm}
-            className="bg-primary py-3.5 rounded-full items-center justify-center shadow-lg shadow-primary/30 active:opacity-90"
-          >
-            <Text className="text-white font-quicksand-bold text-base">
-              Use Current Location
-            </Text>
-          </TouchableOpacity>
+          {/* Selected Address Preview & Confirm Bar */}
+          <View className="p-5 bg-white border-t-2 border-primary/10 shadow-2xl">
+            <View className="flex-row items-start mb-3">
+              <View className="w-9 h-9 rounded-full bg-primary/10 items-center justify-center mr-3 mt-0.5 border border-primary/20">
+                <Text className="text-base">📍</Text>
+              </View>
+              <View className="flex-1">
+                <Text className="text-xs font-quicksand-semibold text-gray-400 uppercase tracking-wider">
+                  Selected Address
+                </Text>
+                {isGeocoding ? (
+                  <View className="flex-row items-center mt-1">
+                    <ActivityIndicator size="small" color="#53B175" className="mr-2" />
+                    <Text className="text-gray-400 font-quicksand-medium text-sm">
+                      Fetching address details...
+                    </Text>
+                  </View>
+                ) : (
+                  <Text
+                    className="text-sm font-quicksand-bold text-dark-100 mt-0.5"
+                    numberOfLines={2}
+                  >
+                    {selectedAddress}
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            {/* Quick Save Buttons */}
+            <View className="flex-row gap-2 mb-3">
+              <TouchableOpacity
+                onPress={() => handleSaveAsLabel('Home')}
+                className="flex-1 bg-primary/10 border border-primary/30 py-2.5 rounded-full items-center"
+              >
+                <Text className="text-primary font-quicksand-bold text-xs">🏠 Save as Home</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => handleSaveAsLabel('Work')}
+                className="flex-1 bg-primary/10 border border-primary/30 py-2.5 rounded-full items-center"
+              >
+                <Text className="text-primary font-quicksand-bold text-xs">💼 Save as Work</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              onPress={handleConfirm}
+              className="bg-primary py-3.5 rounded-full items-center justify-center shadow-lg shadow-primary/30 active:opacity-90"
+            >
+              <Text className="text-white font-quicksand-bold text-base">
+                Use Current Location
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   )
 }
-

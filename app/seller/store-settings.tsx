@@ -3,6 +3,8 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Text,
   TextInput,
@@ -12,8 +14,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
+import LocationPickerModal from '@/components/LocationPickerModal'
 import useAuthStore from '@/store/auth.store'
-import { updateStoreProfile, uploadImageToStorage } from '@/lib/appwrite'
+import { deleteStorageFileByUrl, updateStoreProfile, uploadImageToStorage } from '@/lib/appwrite'
 import { images } from '@/constants'
 
 export default function SellerStoreSettings() {
@@ -26,6 +29,9 @@ export default function SellerStoreSettings() {
   const [phone, setPhone] = useState(sellerStore?.phone || '')
   const [logoUrl, setLogoUrl] = useState<string | null>(sellerStore?.logoUrl || null)
   const [bannerUrl, setBannerUrl] = useState<string | null>(sellerStore?.bannerUrl || null)
+  const [latitude, setLatitude] = useState<number | null>(sellerStore?.latitude != null ? Number(sellerStore.latitude) : null)
+  const [longitude, setLongitude] = useState<number | null>(sellerStore?.longitude != null ? Number(sellerStore.longitude) : null)
+  const [mapPickerVisible, setMapPickerVisible] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   const handlePickLogo = async () => {
@@ -71,9 +77,15 @@ export default function SellerStoreSettings() {
       let finalBanner = bannerUrl
 
       if (logoUrl && (logoUrl.startsWith('file:') || logoUrl.startsWith('ph:'))) {
+        if (sellerStore?.logoUrl) {
+          await deleteStorageFileByUrl(sellerStore.logoUrl)
+        }
         finalLogo = await uploadImageToStorage(logoUrl, 'store_logo')
       }
       if (bannerUrl && (bannerUrl.startsWith('file:') || bannerUrl.startsWith('ph:'))) {
+        if (sellerStore?.bannerUrl) {
+          await deleteStorageFileByUrl(sellerStore.bannerUrl)
+        }
         finalBanner = await uploadImageToStorage(bannerUrl, 'store_banner')
       }
 
@@ -85,6 +97,8 @@ export default function SellerStoreSettings() {
           phone: phone.trim(),
           logoUrl: finalLogo,
           bannerUrl: finalBanner,
+          latitude: latitude || undefined,
+          longitude: longitude || undefined,
         })
         await fetchAuthenticatedUser()
         Alert.alert('Success', 'Store profile details saved!')
@@ -97,7 +111,7 @@ export default function SellerStoreSettings() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
       {/* Header */}
       <View className="px-5 pt-4 pb-3 flex-row justify-between items-center bg-white border-b border-primary/10">
         <TouchableOpacity
@@ -119,8 +133,16 @@ export default function SellerStoreSettings() {
         <View className="w-10" />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
-        <View className="bg-white rounded-[32px] p-6 border border-primary/10 shadow-lg shadow-black/10">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        className="flex-1"
+      >
+        <ScrollView
+          contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View className="bg-white rounded-[32px] p-6 border border-primary/10 shadow-lg shadow-black/10">
           {/* Banner Graphic Selector */}
           <Text className="font-quicksand-bold text-sm text-dark-100 mb-2">
             Store Front Cover Banner
@@ -182,15 +204,30 @@ export default function SellerStoreSettings() {
           />
 
           {/* Address */}
-          <Text className="font-quicksand-bold text-sm text-dark-100 mb-1">
-            Store Address
-          </Text>
+          <View className="flex-row items-center justify-between mb-1">
+            <Text className="font-quicksand-bold text-sm text-dark-100">
+              Store Address *
+            </Text>
+            <TouchableOpacity
+              onPress={() => setMapPickerVisible(true)}
+              className="bg-primary/10 border border-primary/20 px-3 py-1 rounded-xl flex-row items-center active:opacity-80"
+            >
+              <Text className="text-xs font-quicksand-bold text-primary">📍 Set Location on Map</Text>
+            </TouchableOpacity>
+          </View>
           <TextInput
             value={address}
             onChangeText={setAddress}
             placeholder="e.g. 12 Commerce Street, Lagos"
-            className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 font-quicksand-semibold mb-4"
+            className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 font-quicksand-semibold mb-1"
           />
+          {latitude && longitude ? (
+            <Text className="text-xs text-green-600 font-quicksand-bold mb-4">
+              ✓ Map Location Pin Set ({latitude.toFixed(4)}, {longitude.toFixed(4)})
+            </Text>
+          ) : (
+            <View className="mb-4" />
+          )}
 
           {/* Phone */}
           <Text className="font-quicksand-bold text-sm text-dark-100 mb-1">
@@ -219,7 +256,19 @@ export default function SellerStoreSettings() {
             )}
           </TouchableOpacity>
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      <LocationPickerModal
+        visible={mapPickerVisible}
+        onClose={() => setMapPickerVisible(false)}
+        titleNote="Pin Store Location on Map"
+        onSelectLocation={(loc) => {
+          setAddress(loc.address)
+          setLatitude(loc.latitude)
+          setLongitude(loc.longitude)
+        }}
+      />
     </SafeAreaView>
   )
 }

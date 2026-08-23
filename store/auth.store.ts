@@ -14,7 +14,7 @@ type AuthState = {
     setIsAuthenticated: (value: boolean) => void;
     setUser: (user: User | null) => void;
     setLoading: (loading: boolean) => void;
-    fetchAuthenticatedUser: () => Promise<void>;
+    fetchAuthenticatedUser: (silent?: boolean) => Promise<void>;
 }
 
 const adminEmail = process.env.EXPO_PUBLIC_ADMIN_EMAIL || 'admin@grocery.com';
@@ -37,8 +37,8 @@ const useAuthStore = create<AuthState>((set) => ({
     },
     setLoading: (value) => set({ isLoading: value }),
 
-    fetchAuthenticatedUser: async () => {
-        set({ isLoading: true });
+    fetchAuthenticatedUser: async (silent = false) => {
+        if (!silent) set({ isLoading: true });
 
         try {
             const user = await getCurrentUser();
@@ -103,7 +103,7 @@ const useAuthStore = create<AuthState>((set) => ({
                 sellerStore: null,
             });
         } finally {
-            set({ isLoading: false });
+            if (!silent) set({ isLoading: false });
         }
     }
 }))

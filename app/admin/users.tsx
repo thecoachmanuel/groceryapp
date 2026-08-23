@@ -1,3 +1,15 @@
+import FastImage from '@/components/FastImage'
+import { images } from '@/constants'
+import {
+  adminUpdateCustomerEmail,
+  creditCustomerWallet,
+  debitCustomerWallet,
+  getAllCustomers,
+  getCustomerWallet,
+  getWalletTransactions,
+  updateCustomerBlockStatus,
+} from '@/lib/appwrite'
+import { useFocusEffect, useRouter } from 'expo-router'
 import React, { useCallback, useState } from 'react'
 import {
   ActivityIndicator,
@@ -9,25 +21,13 @@ import {
   Modal,
   Platform,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
-import { useFocusEffect, useRouter } from 'expo-router'
-import {
-  adminUpdateCustomerEmail,
-  getAllCustomers,
-  updateCustomerBlockStatus,
-  getCustomerWallet,
-  getWalletTransactions,
-  creditCustomerWallet,
-  debitCustomerWallet,
-} from '@/lib/appwrite'
-import { images } from '@/constants'
-import FastImage from '@/components/FastImage'
-import { ScrollView } from 'react-native'
 
 export default function AdminUsersScreen() {
   const router = useRouter()
@@ -66,7 +66,7 @@ export default function AdminUsersScreen() {
               const altId = c.$id !== uId ? c.$id : c.accountId
               const w = await getCustomerWallet(uId, altId, c.email)
               if (w) balances[c.$id] = Number(w.balance) || 0
-            } catch {}
+            } catch { }
           })
         )
         setWalletMap(balances)
@@ -205,8 +205,8 @@ export default function AdminUsersScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-light">
-      <StatusBar barStyle="dark-content" backgroundColor="#E6F7EC" />
+    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Header Bar */}
       <View className="px-5 pt-4 pb-3 flex-row items-center justify-between">
@@ -291,16 +291,14 @@ export default function AdminUsersScreen() {
 
                 {/* Status Badge */}
                 <View
-                  className={`px-3 py-1 rounded-full border ${
-                    isBlocked
-                      ? 'bg-red-500/10 border-red-500/30'
-                      : 'bg-green-500/10 border-green-500/30'
-                  }`}
+                  className={`px-3 py-1 rounded-full border ${isBlocked
+                    ? 'bg-red-500/10 border-red-500/30'
+                    : 'bg-green-500/10 border-green-500/30'
+                    }`}
                 >
                   <Text
-                    className={`font-quicksand-bold text-xs ${
-                      isBlocked ? 'text-red-600' : 'text-green-700'
-                    }`}
+                    className={`font-quicksand-bold text-xs ${isBlocked ? 'text-red-600' : 'text-green-700'
+                      }`}
                   >
                     {isBlocked ? '🚫 Blocked' : '✅ Active'}
                   </Text>
@@ -314,7 +312,7 @@ export default function AdminUsersScreen() {
                     👛 Available Wallet Balance:
                   </Text>
                   <Text className="text-sm font-quicksand-bold text-green-700">
-                    ₦ {(walletMap[item.$id] ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    ₦ {(walletMap[item.$id] ?? walletMap[item.accountId] ?? walletMap[item.email] ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </Text>
                 </View>
 
@@ -351,16 +349,14 @@ export default function AdminUsersScreen() {
 
                   <TouchableOpacity
                     onPress={() => handleToggleBlock(item)}
-                    className={`px-3 py-2 rounded-2xl border ${
-                      isBlocked
-                        ? 'bg-green-500/10 border-green-500/30'
-                        : 'bg-red-500/10 border-red-500/30'
-                    }`}
+                    className={`px-3 py-2 rounded-2xl border ${isBlocked
+                      ? 'bg-green-500/10 border-green-500/30'
+                      : 'bg-red-500/10 border-red-500/30'
+                      }`}
                   >
                     <Text
-                      className={`font-quicksand-bold text-xs ${
-                        isBlocked ? 'text-green-700' : 'text-red-600'
-                      }`}
+                      className={`font-quicksand-bold text-xs ${isBlocked ? 'text-green-700' : 'text-red-600'
+                        }`}
                     >
                       {isBlocked ? '✅ Unblock' : '🚫 Block'}
                     </Text>

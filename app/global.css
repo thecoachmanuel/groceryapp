@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body, #root {
+  background-color: #ffffff !important;
+}
+
 @layer utilities {
   .flex-center {
     @apply flex items-center justify-center;
@@ -18,7 +22,7 @@
 
 @layer components {
   .cart-btn {
-    @apply flex items-center justify-center size-10 rounded-full bg-dark-100;
+    @apply flex items-center justify-center size-10 rounded-full bg-primary/10 border border-primary/20;
   }
 
   .cart-badge {
