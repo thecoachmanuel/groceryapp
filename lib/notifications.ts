@@ -1,16 +1,18 @@
 import * as Notifications from 'expo-notifications'
 import { Platform } from 'react-native'
 
-// Configure global notification handler for Foreground & Background presentation
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-})
+// Configure global notification handler for Foreground & Background presentation (Native only)
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  })
+}
 
 /**
  * Register device for system notification channels & permissions

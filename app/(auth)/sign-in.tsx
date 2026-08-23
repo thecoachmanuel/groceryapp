@@ -101,7 +101,9 @@ const SignIn = () => {
       }
     } catch (error: any) {
       Alert.alert('Error', error.message)
-      Sentry.captureException(error)
+      if (Platform.OS !== 'web') {
+        try { Sentry.captureException(error) } catch {}
+      }
     } finally {
       setIsSubmitting(false)
     }

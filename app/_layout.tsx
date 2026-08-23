@@ -3,19 +3,26 @@ import { useFonts } from 'expo-font';
 import { useEffect} from "react";
 
 import './global.css';
+import { Platform } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import useAuthStore from "@/store/auth.store";
 
-Sentry.init({
-  dsn: 'https://94edd17ee98a307f2d85d750574c454a@o4506876178464768.ingest.us.sentry.io/4509588544094208',
-  sendDefaultPii: true,
-  replaysSessionSampleRate: 1,
-  replaysOnErrorSampleRate: 1,
-  integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
-});
+if (Platform.OS !== 'web') {
+  try {
+    Sentry.init({
+      dsn: 'https://94edd17ee98a307f2d85d750574c454a@o4506876178464768.ingest.us.sentry.io/4509588544094208',
+      sendDefaultPii: true,
+      replaysSessionSampleRate: 1,
+      replaysOnErrorSampleRate: 1,
+      integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
+    });
+  } catch (err) {
+    console.warn('[SENTRY] Initialization skipped on this platform:', err);
+  }
+}
 
 import { useState } from 'react';
-import { Animated, ActivityIndicator, Image, Platform, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-native';
 import { subscribeToOrders } from "@/lib/appwrite";
 import { images } from "@/constants";
 import useBrandingStore from "@/store/branding.store";
@@ -24,7 +31,7 @@ import useNotificationStore from "@/store/notification.store";
 import { registerForPushNotificationsAsync, sendLocalNotification } from "@/lib/notifications";
 import * as Updates from 'expo-updates';
 
-export default Sentry.wrap(function RootLayout() {
+function RootLayout() {
   const router = useRouter();
   const { isLoading, fetchAuthenticatedUser, user, role, isSeller, isAdmin, sellerStore } = useAuthStore();
   const { appName, appLogo, fetchBranding } = useBrandingStore();
@@ -255,7 +262,6 @@ export default Sentry.wrap(function RootLayout() {
       )}
     </View>
   );
-});
+}
 
-
-// Sentry.showFeedbackWidget();
+export default Platform.OS === 'web' ? RootLayout : Sentry.wrap(RootLayout);
