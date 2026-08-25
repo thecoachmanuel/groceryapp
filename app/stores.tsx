@@ -121,8 +121,8 @@ export default function AllStoresScreen() {
                   </Text>
                 </View>
                 <View className="bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
-                  <Text className="text-[11px] text-primary font-quicksand-bold">
-                    ⚡ Fast Local Delivery
+                  <Text className="text-[11px] text-primary font-quicksand-bold" style={{ color: '#53B175' }}>
+                    ⏱️ Fast Local Delivery
                   </Text>
                 </View>
               </View>
@@ -162,7 +162,8 @@ export default function AllStoresScreen() {
               <TouchableOpacity
                 activeOpacity={0.88}
                 onPress={openStore}
-                className="bg-white rounded-[32px] mb-5 border-2 border-primary/15 overflow-hidden shadow-xl shadow-black/5"
+                className="bg-white rounded-[32px] mb-5 border border-[#F1F1F1] overflow-hidden"
+                style={{ borderColor: '#F1F1F1' }}
               >
                 {/* Store Header Banner Cover */}
                 <View className="w-full h-36 bg-primary/10 relative justify-center items-center">
@@ -178,15 +179,15 @@ export default function AllStoresScreen() {
                   <View className="absolute top-3.5 right-3.5 bg-white/95 px-3 py-1.5 rounded-full flex-row items-center border border-amber-500/20 shadow-md">
                     <Text className="text-xs mr-1">⭐</Text>
                     <Text className="font-quicksand-bold text-xs text-amber-700">
-                      {store.rating || 4.9}
+                      {store.rating != null && Number(store.rating) > 0 ? Number(store.rating).toFixed(1) : '5.0'}
+                      {store.totalReviews ? ` (${store.totalReviews})` : ''}
                     </Text>
                   </View>
 
                   {/* Status Badge */}
                   <View className="absolute top-3.5 left-3.5 bg-emerald-600 px-3 py-1.5 rounded-full flex-row items-center shadow-md">
-                    <View className="w-2 h-2 bg-white rounded-full mr-1.5" />
                     <Text className="text-white font-quicksand-bold text-[10px] uppercase tracking-wider">
-                      Verified Partner 🟢
+                      Verified Partner ✓
                     </Text>
                   </View>
                 </View>
@@ -212,8 +213,8 @@ export default function AllStoresScreen() {
 
                     {/* Delivery Time Badge */}
                     <View className="bg-primary/10 border border-primary/20 px-3.5 py-1.5 rounded-full flex-row items-center mb-1">
-                      <Text className="text-xs font-quicksand-bold text-primary">
-                        📍 {store.distanceKm != null ? `${store.distanceKm} km away` : (store.deliveryTime || '15-25 min delivery')}
+                      <Text className="text-xs font-quicksand-bold text-primary" style={{ color: '#53B175' }}>
+                        ⏱️ {store.deliveryTime || '15-25 min'} {store.distanceKm != null ? `• ${store.distanceKm} km` : ''}
                       </Text>
                     </View>
                   </View>
@@ -229,7 +230,7 @@ export default function AllStoresScreen() {
                   {/* Address & Contact Info if present */}
                   {store.address ? (
                     <View className="flex-row items-center mt-3 bg-primary/5 p-2.5 rounded-2xl border border-primary/15">
-                      <Text className="text-xs mr-2">📍</Text>
+                      <Image source={images.location} className="w-3.5 h-3.5 mr-2" resizeMode="contain" />
                       <Text className="text-gray-700 font-quicksand-bold text-xs flex-1" numberOfLines={1}>
                         {store.address}
                       </Text>

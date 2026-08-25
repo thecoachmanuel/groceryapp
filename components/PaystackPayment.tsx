@@ -12,11 +12,13 @@
  */
 
 import React, { useMemo, useRef } from 'react'
-import { Modal, View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native'
+import { Modal, View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { WebView } from 'react-native-webview'
 
-const PAYSTACK_PK = process.env.EXPO_PUBLIC_PAYSTACK_PUBLIC_KEY || ''
+const PAYSTACK_PK =
+  process.env.EXPO_PUBLIC_PAYSTACK_PUBLIC_KEY ||
+  'pk_test_680d5e235339eb90e91c30891100e2d4dc245c10'
 
 interface PaystackPaymentProps {
   visible: boolean
@@ -49,11 +51,21 @@ export function PaystackPayment({
 
   const activeRef = sessionRef.current || reference || `TX_${Date.now()}`
 
+  // Stable metadata JSON string to prevent unnecessary html re-computations
+  const metadataStr = useMemo(() => {
+    try {
+      return JSON.stringify(metadata || {})
+    } catch {
+      return '{}'
+    }
+  }, [JSON.stringify(metadata || {})])
+
   // Build frozen inline HTML string that loads Paystack Inline JS without re-rendering on parent state changes
   const html = useMemo(() => {
     if (!visible) return ''
     const amountKobo = Math.round((amount || 0) * 100)
     const firstName = (name || email || 'Customer').split(' ')[0]
+    const pk = PAYSTACK_PK
 
     return `
 <!DOCTYPE html>
@@ -62,24 +74,34 @@ export function PaystackPayment({
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #ffffff; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    #msg { color: #53B175; font-size: 15px; font-weight: 600; text-align: center; }
+    body { background: #ffffff; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; }
+    #msg { color: #53B175; font-size: 15px; font-weight: 600; text-align: center; margin-top: 14px; }
+    .spinner { width: 38px; height: 38px; border: 3px solid rgba(83, 177, 117, 0.2); border-top-color: #53B175; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
+  <div class="spinner"></div>
   <p id="msg">🔒 Initializing Paystack Checkout…</p>
-  <script src="https://js.paystack.co/v1/inline.js"></script>
+
   <script>
-    window.onload = function() {
+    var paystackInitialized = false;
+
+    function startPaystack() {
+      if (paystackInitialized) return;
+      paystackInitialized = true;
       try {
+        if (typeof PaystackPop === 'undefined') {
+          throw new Error('Paystack SDK is loading…');
+        }
         var handler = PaystackPop.setup({
-          key: '${PAYSTACK_PK}',
+          key: '${pk}',
           email: '${email}',
           amount: ${amountKobo},
           currency: 'NGN',
           ref: '${activeRef}',
           firstname: '${firstName}',
-          metadata: ${JSON.stringify(metadata)},
+          metadata: ${metadataStr},
           callback: function(response) {
             window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'success', reference: response.reference }));
           },
@@ -89,22 +111,54 @@ export function PaystackPayment({
         });
         handler.openIframe();
       } catch(e) {
-        document.getElementById('msg').innerText = 'Payment initialization error: ' + e.message;
+        paystackInitialized = false;
+        document.getElementById('msg').innerText = 'Payment error: ' + e.message;
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', message: e.message }));
+      }
+    }
+
+    function onScriptLoad() {
+      startPaystack();
+    }
+
+    function onScriptError() {
+      document.getElementById('msg').innerText = 'Unable to connect to Paystack gateway. Check internet connection.';
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', message: 'Paystack script load failed. Please check connection.' }));
+    }
+
+    window.onload = function() {
+      if (typeof PaystackPop !== 'undefined') {
+        startPaystack();
+      } else {
+        var attempts = 0;
+        var timer = setInterval(function() {
+          attempts++;
+          if (typeof PaystackPop !== 'undefined') {
+            clearInterval(timer);
+            startPaystack();
+          } else if (attempts > 25) {
+            clearInterval(timer);
+            onScriptError();
+          }
+        }, 300);
       }
     };
   </script>
+  <script src="https://js.paystack.co/v1/inline.js" onload="onScriptLoad()" onerror="onScriptError()"></script>
 </body>
 </html>
 `
-  }, [visible, amount, email, name, activeRef, metadata])
+  }, [visible, amount, email, name, activeRef, metadataStr])
 
   const handleMessage = (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data)
       if (data.type === 'success') {
         onSuccess(data.reference || activeRef)
-      } else if (data.type === 'cancel' || data.type === 'error') {
+      } else if (data.type === 'cancel') {
+        onCancel()
+      } else if (data.type === 'error') {
+        Alert.alert('Payment Error', data.message || 'Could not initialize Paystack payment gateway.')
         onCancel()
       }
     } catch {
@@ -131,6 +185,11 @@ export function PaystackPayment({
           javaScriptEnabled
           domStorageEnabled
           startInLoadingState
+          originWhitelist={['*']}
+          mixedContentMode="always"
+          javaScriptCanOpenWindowsAutomatically
+          setSupportMultipleWindows={false}
+          userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1"
           renderLoading={() => (
             <View style={styles.loading}>
               <ActivityIndicator size="large" color="#53B175" />

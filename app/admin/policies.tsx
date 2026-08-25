@@ -48,6 +48,7 @@ export default function AdminPoliciesScreen() {
   const [distanceFarRate, setDistanceFarRate] = useState('1800') // 7-12km
   const [distancePerKmRate, setDistancePerKmRate] = useState('150') // >12km
   const [maxDeliveryRadiusKm, setMaxDeliveryRadiusKm] = useState('20')
+  const [multiStorePickupFee, setMultiStorePickupFee] = useState('500')
 
   // Live Test Simulation State for Admin
   const [simItemsCount, setSimItemsCount] = useState(3)
@@ -80,6 +81,7 @@ export default function AdminPoliciesScreen() {
         setDistanceFarRate((data.distanceFarRate != null ? data.distanceFarRate : 1800).toString())
         setDistancePerKmRate((data.distancePerKmRate != null ? data.distancePerKmRate : 150).toString())
         setMaxDeliveryRadiusKm((data.maxDeliveryRadiusKm != null ? data.maxDeliveryRadiusKm : 20).toString())
+        setMultiStorePickupFee((data.multiStorePickupFee != null ? data.multiStorePickupFee : 500).toString())
       }
     } catch (err) {
       console.error('Error fetching policies:', err)
@@ -115,6 +117,7 @@ export default function AdminPoliciesScreen() {
         distanceFarRate: parseFloat(distanceFarRate) || 1800,
         distancePerKmRate: parseFloat(distancePerKmRate) || 150,
         maxDeliveryRadiusKm: parseFloat(maxDeliveryRadiusKm) || 20,
+        multiStorePickupFee: parseFloat(multiStorePickupFee) || 500,
       })
 
       Alert.alert('Policies Saved', 'Platform delivery pricing policy updated successfully!')
@@ -138,6 +141,7 @@ export default function AdminPoliciesScreen() {
   const numDistFar = parseFloat(distanceFarRate) || 1800
   const numDistPerKm = parseFloat(distancePerKmRate) || 150
   const numMaxRadius = parseFloat(maxDeliveryRadiusKm) || 20
+  const numMultiStoreFee = parseFloat(multiStorePickupFee) || 500
 
   // Run live calculation for simulated cart
   const simResult = calculateDynamicDeliveryFee(
@@ -158,6 +162,7 @@ export default function AdminPoliciesScreen() {
       distanceFarRate: numDistFar,
       distancePerKmRate: numDistPerKm,
       maxDeliveryRadiusKm: numMaxRadius,
+      multiStorePickupFee: numMultiStoreFee,
     },
     {
       distanceKm: parseFloat(simDistanceKm) || 2.5,
@@ -518,6 +523,21 @@ export default function AdminPoliciesScreen() {
               className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 font-quicksand-bold text-lg text-dark-100 mb-5"
             />
 
+            {/* Multi-Store Pickup Surcharge */}
+            <Text className="font-quicksand-bold text-xs text-dark-100 mb-1">
+              5. Multi-Store Pickup Surcharge Per Extra Store (₦)
+            </Text>
+            <Text className="text-gray-400 font-quicksand-medium text-[11px] mb-2">
+              Charged per additional unique vendor in a multi-store cart to cover extra rider pickup stops without running at a loss.
+            </Text>
+            <TextInput
+              keyboardType="numeric"
+              value={multiStorePickupFee}
+              onChangeText={setMultiStorePickupFee}
+              placeholder="e.g. 500"
+              className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 font-quicksand-bold text-lg text-dark-100 mb-5"
+            />
+
             {/* Live Interactive Test Simulation Preview Card */}
             <View className="rounded-2xl p-4 border" style={{ backgroundColor: 'rgba(83, 177, 117, 0.08)', borderColor: 'rgba(83, 177, 117, 0.3)' }}>
               <View className="flex-row items-center justify-between mb-3">
@@ -560,6 +580,14 @@ export default function AdminPoliciesScreen() {
                     + ₦ {simResult.incrementalFee.toLocaleString()}
                   </Text>
                 </View>
+                {simResult.multiStoreSurcharge > 0 && (
+                  <View className="flex-row justify-between">
+                    <Text className="text-amber-800 font-quicksand-medium text-xs">Multi-Store Pickup Surcharge:</Text>
+                    <Text className="font-quicksand-bold text-xs text-amber-800">
+                      + ₦ {simResult.multiStoreSurcharge.toLocaleString()}
+                    </Text>
+                  </View>
+                )}
                 <View className="flex-row justify-between items-center pt-1 mt-1 border-t border-primary/15">
                   <Text className="text-dark-100 font-quicksand-bold text-xs">Total Customer Delivery Fee:</Text>
                   <Text className="font-quicksand-bold text-base" style={{ color: '#53B175' }}>

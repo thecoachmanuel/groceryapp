@@ -28,7 +28,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 
 
@@ -58,6 +58,9 @@ export default function AdminSellers() {
   const [editBannerUrl, setEditBannerUrl] = useState<string | null>(null)
   const [editCommissionRate, setEditCommissionRate] = useState('10.0')
   const [editStatus, setEditStatus] = useState('active')
+  const [editBankName, setEditBankName] = useState('')
+  const [editAccountNumber, setEditAccountNumber] = useState('')
+  const [editAccountName, setEditAccountName] = useState('')
   const [savingStore, setSavingStore] = useState(false)
   const [storeMapPickerVisible, setStoreMapPickerVisible] = useState(false)
   const [editLatitude, setEditLatitude] = useState<number | null>(null)
@@ -73,6 +76,9 @@ export default function AdminSellers() {
     setEditBannerUrl(st.bannerUrl || null)
     setEditCommissionRate((st.commissionRate || 10.0).toString())
     setEditStatus(st.status || 'active')
+    setEditBankName(st.bankName || '')
+    setEditAccountNumber(st.accountNumber || '')
+    setEditAccountName(st.accountName || '')
     setEditLatitude(st.latitude != null ? Number(st.latitude) : null)
     setEditLongitude(st.longitude != null ? Number(st.longitude) : null)
   }
@@ -142,11 +148,14 @@ export default function AdminSellers() {
         bannerUrl: finalBanner,
         commissionRate: parseFloat(editCommissionRate) || 10.0,
         status: editStatus,
+        bankName: editBankName.trim() || undefined,
+        accountNumber: editAccountNumber.trim() || undefined,
+        accountName: editAccountName.trim() || undefined,
         latitude: editLatitude || undefined,
         longitude: editLongitude || undefined,
       })
 
-      Alert.alert('Success', `Store "${editStoreName}" profile & pictures updated!`)
+      Alert.alert('Success', `Store "${editStoreName}" profile, pictures & banking updated!`)
       setEditStoreModal(null)
       fetchStores()
     } catch (err: any) {
@@ -262,6 +271,9 @@ export default function AdminSellers() {
     }
   }
 
+  const insets = useSafeAreaInsets()
+  const bottomInset = Math.max(insets.bottom || 0, 16)
+
   return (
     <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
       {/* Header */}
@@ -298,7 +310,8 @@ export default function AdminSellers() {
         <FlatList
           data={stores}
           keyExtractor={(item) => item.$id}
-          contentContainerClassName="p-5 pb-32"
+          contentContainerClassName="p-5"
+          contentContainerStyle={{ paddingBottom: bottomInset + 32 }}
           ListEmptyComponent={() => (
             <View className="items-center mt-20 px-8">
               <Text className="text-4xl mb-3">🏪</Text>
@@ -662,6 +675,45 @@ export default function AdminSellers() {
                 </View>
               </View>
 
+              {/* Store Payout Banking Details */}
+              <View className="mb-5 p-4 bg-gray-50 border border-gray-200 rounded-2xl">
+                <Text className="font-quicksand-bold text-xs text-dark-100 mb-2">
+                  🏦 Store Payout Bank Credentials
+                </Text>
+                
+                <View className="mb-2.5">
+                  <Text className="font-quicksand-semibold text-[11px] text-gray-500 mb-1">Bank Name</Text>
+                  <TextInput
+                    value={editBankName}
+                    onChangeText={setEditBankName}
+                    placeholder="e.g. GTBank, Zenith, Access, Kuda"
+                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 font-quicksand-bold text-dark-100 text-xs"
+                  />
+                </View>
+
+                <View className="mb-2.5">
+                  <Text className="font-quicksand-semibold text-[11px] text-gray-500 mb-1">10-Digit Account Number</Text>
+                  <TextInput
+                    value={editAccountNumber}
+                    onChangeText={setEditAccountNumber}
+                    keyboardType="numeric"
+                    maxLength={10}
+                    placeholder="0123456789"
+                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 font-quicksand-bold text-dark-100 text-xs"
+                  />
+                </View>
+
+                <View>
+                  <Text className="font-quicksand-semibold text-[11px] text-gray-500 mb-1">Account Beneficiary Name</Text>
+                  <TextInput
+                    value={editAccountName}
+                    onChangeText={setEditAccountName}
+                    placeholder="e.g. Fresh Mart Ventures"
+                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 font-quicksand-bold text-dark-100 text-xs"
+                  />
+                </View>
+              </View>
+
               <TouchableOpacity
                 onPress={handleSaveStoreDetails}
                 disabled={savingStore}
@@ -671,7 +723,7 @@ export default function AdminSellers() {
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <Text className="text-white font-quicksand-bold text-base">
-                    Save Store Profile & Pictures 💾
+                    Save Store Profile & Banking 💾
                   </Text>
                 )}
               </TouchableOpacity>

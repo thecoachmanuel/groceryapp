@@ -1,5 +1,6 @@
 import { images } from '@/constants'
 import { account, getAllOrders, updateOrderStatus } from '@/lib/appwrite'
+import { scheduleOrderRatingNotification } from '@/lib/notifications'
 import useAuthStore from '@/store/auth.store'
 import useNotificationStore from '@/store/notification.store'
 import { Ionicons } from '@expo/vector-icons'
@@ -16,7 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 function normalizeStatus(rawStatus?: string): 'order_placed' | 'preparing' | 'on_the_way' | 'delivered' | 'cancelled' {
   if (!rawStatus) return 'order_placed'
@@ -112,6 +113,9 @@ export default function AdminOrders() {
     try {
       setUpdatingId(orderId)
       await updateOrderStatus(orderId, newStatus)
+      if (newStatus === 'delivered') {
+        scheduleOrderRatingNotification(orderId, 'Store', 0)
+      }
       Alert.alert('Status Updated ✅', `Order #${orderId.slice(-6)} changed to "${newStatus.replace(/_/g, ' ').toUpperCase()}"`)
       await fetchOrders()
     } catch (err: any) {
@@ -196,6 +200,9 @@ export default function AdminOrders() {
       return norm === activeFilter
     })
   }, [orders, activeFilter])
+
+  const insets = useSafeAreaInsets()
+  const bottomInset = Math.max(insets.bottom || 0, 16)
 
   return (
     <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
@@ -389,7 +396,7 @@ export default function AdminOrders() {
         <FlatList
           data={filteredOrders}
           keyExtractor={(item, index) => item?.$id || String(index)}
-          contentContainerStyle={{ padding: 20, paddingBottom: 140 }}
+          contentContainerStyle={{ padding: 20, paddingBottom: bottomInset + 80 }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#53B175']} />
           }

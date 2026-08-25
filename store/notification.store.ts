@@ -30,8 +30,8 @@ interface NotificationState {
 const DEFAULT_NOTIFICATIONS: AppNotification[] = [
   {
     id: 'notif_welcome',
-    title: 'Welcome to Grocery App! 🥬',
-    body: 'Explore fresh groceries, daily farm picks, and fast doorstep delivery.',
+    title: 'Welcome to the App! 🎉',
+    body: 'Explore fresh items, store picks, and fast doorstep delivery.',
     type: 'system',
     targetRole: 'all',
     timestamp: new Date().toISOString(),

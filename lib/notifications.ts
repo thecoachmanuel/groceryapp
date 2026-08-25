@@ -1,18 +1,16 @@
 import * as Notifications from 'expo-notifications'
 import { Platform } from 'react-native'
 
-// Configure global notification handler for Foreground & Background presentation (Native only)
-if (Platform.OS !== 'web') {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-    }),
-  })
-}
+// Configure global notification handler for Foreground & Background presentation
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+})
 
 /**
  * Register device for system notification channels & permissions
@@ -36,11 +34,11 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
 
     // 2. Request System Permissions (Android 13+ & iOS)
     const settings = await Notifications.getPermissionsAsync()
-    let isGranted = settings.granted || Boolean(settings.ios && settings.ios.status === Notifications.IosAuthorizationStatus.PROVISIONAL)
+    let isGranted = Boolean((settings as any)?.granted || (settings as any)?.status === 'granted' || (settings as any)?.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL)
 
     if (!isGranted) {
       const req = await Notifications.requestPermissionsAsync()
-      isGranted = req.granted
+      isGranted = Boolean((req as any)?.granted || (req as any)?.status === 'granted')
     }
 
     if (!isGranted) {
@@ -84,5 +82,40 @@ export async function sendLocalNotification(
     })
   } catch (err) {
     console.error('[NOTIFICATIONS] Failed to trigger local notification:', err)
+  }
+}
+
+/**
+ * Schedule a gentle rating reminder notification when an order is delivered
+ * Triggered after a few minutes so customers receive a background alert if minimized.
+ */
+export async function scheduleOrderRatingNotification(
+  orderId: string,
+  storeName = 'Store',
+  delaySeconds = 180
+) {
+  if (Platform.OS === 'web') return
+
+  try {
+    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default
+    const key = `@rating_notif_sent_${orderId}`
+    const alreadySent = await AsyncStorage.getItem(key)
+    if (alreadySent) return
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: '⭐ How was your grocery delivery?',
+        body: `Your order from ${storeName} has been delivered. Tap to share your rating & experience!`,
+        sound: 'default',
+        data: { url: `/order/${orderId}`, orderId },
+      },
+      trigger: delaySeconds > 0
+        ? ({ type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: delaySeconds, repeats: false } as any)
+        : null,
+    })
+
+    await AsyncStorage.setItem(key, 'true')
+  } catch (err) {
+    console.warn('[NOTIFICATIONS] Failed to schedule rating notification:', err)
   }
 }

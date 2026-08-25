@@ -1,6 +1,5 @@
 import { CreateUserParams, GetMenuParams, SignInParams } from '@/type'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { Platform } from 'react-native'
 import {
   Account,
   Avatars,
@@ -31,6 +30,7 @@ export const appwriteConfig = {
   sellerPayoutsCollectionId: 'seller_payouts',
   couponsCollectionId: 'coupons',
   platformPoliciesCollectionId: 'platform_policies',
+  storeReviewsCollectionId: 'store_reviews',
 }
 
 export const client = new Client()
@@ -38,10 +38,7 @@ export const client = new Client()
 client
   .setEndpoint(appwriteConfig.endpoint)
   .setProject(appwriteConfig.projectId)
-
-if (Platform.OS !== 'web') {
-  client.setPlatform(appwriteConfig.platform)
-}
+  .setPlatform(appwriteConfig.platform)
 
 export const account = new Account(client)
 export const databases = new Databases(client)
@@ -303,42 +300,73 @@ export const seedDefaultBannersIfEmpty = async () => {
 }
 
 
-export const createBanner = async (bannerData: {
-  title: string
-  subtitle?: string
-  imageUrl: string
-  gradientStart: string
-  gradientEnd: string
-  isActive?: boolean
-  displayOrder?: number
-  targetCategory?: string
-}) => {
+export const createBanner = async (bannerData: any) => {
+  const payload = {
+    ...bannerData,
+    isActive: bannerData.isActive ?? true,
+    displayOrder: bannerData.displayOrder ?? 1,
+    subtitle: bannerData.hideTextOverlay && (!bannerData.subtitle || bannerData.subtitle.trim() === '')
+      ? '[HIDE_TEXT]'
+      : bannerData.subtitle || '',
+  }
+
   try {
     return await databases.createDocument(
       appwriteConfig.databaseId,
       appwriteConfig.bannersCollectionId,
       ID.unique(),
-      {
-        ...bannerData,
-        isActive: bannerData.isActive ?? true,
-        displayOrder: bannerData.displayOrder ?? 1,
-      },
+      payload,
     )
   } catch (e: any) {
-    throw new Error(e.message || String(e))
+    // Fallback if Appwrite collection schema rejects custom attributes
+    try {
+      const sanitized: any = { ...payload }
+      delete sanitized.hideTextOverlay
+      delete sanitized.bannerMode
+      delete sanitized.isFullImage
+
+      return await databases.createDocument(
+        appwriteConfig.databaseId,
+        appwriteConfig.bannersCollectionId,
+        ID.unique(),
+        sanitized,
+      )
+    } catch (fallbackError: any) {
+      throw new Error(fallbackError.message || e.message || String(e))
+    }
   }
 }
 
 export const updateBanner = async (bannerId: string, bannerData: Partial<any>) => {
+  const payload = { ...bannerData }
+  if (bannerData.hideTextOverlay && (!bannerData.subtitle || bannerData.subtitle.trim() === '')) {
+    payload.subtitle = '[HIDE_TEXT]'
+  }
+
   try {
     return await databases.updateDocument(
       appwriteConfig.databaseId,
       appwriteConfig.bannersCollectionId,
       bannerId,
-      bannerData,
+      payload,
     )
   } catch (e: any) {
-    throw new Error(e.message || String(e))
+    // Fallback if Appwrite collection schema rejects custom attributes
+    try {
+      const sanitized: any = { ...payload }
+      delete sanitized.hideTextOverlay
+      delete sanitized.bannerMode
+      delete sanitized.isFullImage
+
+      return await databases.updateDocument(
+        appwriteConfig.databaseId,
+        appwriteConfig.bannersCollectionId,
+        bannerId,
+        sanitized,
+      )
+    } catch (fallbackError: any) {
+      throw new Error(fallbackError.message || e.message || String(e))
+    }
   }
 }
 
@@ -461,7 +489,29 @@ export const getStores = async () => {
       appwriteConfig.databaseId,
       appwriteConfig.storesCollectionId,
     )
-    return stores.documents
+    const docs = stores.documents || []
+
+    // Enrich with dynamic live reviews/ratings
+    const enriched = await Promise.all(
+      docs.map(async (st: any) => {
+        try {
+          const revs = await getStoreReviews(st.$id || st.id)
+          if (revs && revs.length > 0) {
+            const count = revs.length
+            const sum = revs.reduce((acc: number, r: any) => acc + (Number(r.rating) || 5), 0)
+            const avg = Math.round((sum / count) * 10) / 10
+            return {
+              ...st,
+              rating: avg,
+              totalReviews: count,
+            }
+          }
+        } catch {}
+        return st
+      })
+    )
+
+    return enriched
   } catch (e) {
     console.error('Error getting stores:', e)
     return []
@@ -766,6 +816,7 @@ export const DEFAULT_STORE_PRODUCTS: Record<string, any[]> = {
 export const getStoreById = async (storeId: string) => {
   try {
     if (!storeId) return null
+    let foundStore: any = null
 
     // 1. Try direct document GET
     try {
@@ -774,45 +825,72 @@ export const getStoreById = async (storeId: string) => {
         appwriteConfig.storesCollectionId,
         storeId,
       )
-      if (doc) return doc
+      if (doc) foundStore = doc
     } catch { }
 
     // 2. Try sellerId query
-    try {
-      const bySeller = await databases.listDocuments(
-        appwriteConfig.databaseId,
-        appwriteConfig.storesCollectionId,
-        [Query.equal('sellerId', storeId)],
-      )
-      if (bySeller?.documents && bySeller.documents.length > 0) return bySeller.documents[0]
-    } catch { }
+    if (!foundStore) {
+      try {
+        const bySeller = await databases.listDocuments(
+          appwriteConfig.databaseId,
+          appwriteConfig.storesCollectionId,
+          [Query.equal('sellerId', storeId)],
+        )
+        if (bySeller?.documents && bySeller.documents.length > 0) foundStore = bySeller.documents[0]
+      } catch { }
+    }
 
     // 3. Try userId query
-    try {
-      const byUser = await databases.listDocuments(
-        appwriteConfig.databaseId,
-        appwriteConfig.storesCollectionId,
-        [Query.equal('userId', storeId)],
-      )
-      if (byUser?.documents && byUser.documents.length > 0) return byUser.documents[0]
-    } catch { }
+    if (!foundStore) {
+      try {
+        const byUser = await databases.listDocuments(
+          appwriteConfig.databaseId,
+          appwriteConfig.storesCollectionId,
+          [Query.equal('userId', storeId)],
+        )
+        if (byUser?.documents && byUser.documents.length > 0) foundStore = byUser.documents[0]
+      } catch { }
+    }
 
     // 4. Fallback search all stores from Appwrite
-    const all = await getStores()
-    const foundLive = all.find(
-      (s: any) =>
-        s.$id === storeId ||
-        s.id === storeId ||
-        s.sellerId === storeId ||
-        s.userId === storeId
-    )
-    if (foundLive) return foundLive
+    if (!foundStore) {
+      const all = await getStores()
+      const foundLive = all.find(
+        (s: any) =>
+          s.$id === storeId ||
+          s.id === storeId ||
+          s.sellerId === storeId ||
+          s.userId === storeId
+      )
+      if (foundLive) foundStore = foundLive
+    }
 
     // 5. Fallback search default stores
-    const foundDefault = DEFAULT_STORES.find(
-      (s) => s.$id === storeId || s.id === storeId
-    )
-    return foundDefault || null
+    if (!foundStore) {
+      const foundDefault = DEFAULT_STORES.find(
+        (s) => s.$id === storeId || s.id === storeId
+      )
+      if (foundDefault) foundStore = foundDefault
+    }
+
+    if (foundStore) {
+      try {
+        const revs = await getStoreReviews(foundStore.$id || foundStore.id || storeId)
+        if (revs && revs.length > 0) {
+          const count = revs.length
+          const sum = revs.reduce((acc: number, r: any) => acc + (Number(r.rating) || 5), 0)
+          const avg = Math.round((sum / count) * 10) / 10
+          return {
+            ...foundStore,
+            rating: avg,
+            totalReviews: count,
+          }
+        }
+      } catch {}
+      return foundStore
+    }
+
+    return null
   } catch (e) {
     console.error('Error fetching store by ID:', e)
     return DEFAULT_STORES.find((s) => s.$id === storeId || s.id === storeId) || null
@@ -1088,9 +1166,7 @@ export const sortProductsByProximity = (
 // ----------------------------------------------------
 export const getMenu = async ({ category, query, sellerId }: GetMenuParams = {}) => {
   try {
-    const queries: string[] = [Query.limit(100)]
-
-    if (query) queries.push(Query.search('name', query))
+    const queries: string[] = [Query.limit(500)]
 
     if (sellerId) {
       if (Array.isArray(sellerId)) {
@@ -1134,10 +1210,31 @@ export const getMenu = async ({ category, query, sellerId }: GetMenuParams = {})
       }
     }
 
+    let filtered = allDocs
+
+    // Apply multi-attribute search query across name, description, categories, and type
+    if (query && query.trim() !== '') {
+      const qLower = query.toLowerCase().trim()
+      filtered = filtered.filter((d) => {
+        const name = String(d.name || '').toLowerCase()
+        const desc = String(d.description || '').toLowerCase()
+        const cat1 = String(d.categories || '').toLowerCase()
+        const cat2 = String(d.categoryId || '').toLowerCase()
+        const cat3 = String(d.type || '').toLowerCase()
+        return (
+          name.includes(qLower) ||
+          desc.includes(qLower) ||
+          cat1.includes(qLower) ||
+          cat2.includes(qLower) ||
+          cat3.includes(qLower)
+        )
+      })
+    }
+
     // Apply category filter if requested
     if (category && category !== 'all') {
       const catLower = category.toLowerCase().trim()
-      return allDocs.filter((d) => {
+      filtered = filtered.filter((d) => {
         const c1 = String(d.categories || '').toLowerCase()
         const c2 = String(d.categoryId || '').toLowerCase()
         const c3 = String(d.category || '').toLowerCase()
@@ -1146,7 +1243,7 @@ export const getMenu = async ({ category, query, sellerId }: GetMenuParams = {})
       })
     }
 
-    return allDocs
+    return filtered
   } catch (e) {
     console.error('Error fetching menu:', e)
     return []
@@ -1388,12 +1485,33 @@ export const getCategories = async () => {
 
 export const createCategory = async (name: string, slug?: string, iconUrl?: string) => {
   try {
-    return await databases.createDocument(
-      appwriteConfig.databaseId,
-      appwriteConfig.categoriesCollectionId,
-      ID.unique(),
-      { name, slug: slug || name.toLowerCase().replace(/\s+/g, '-'), iconUrl: iconUrl || '', isActive: true },
-    )
+    let payload: any = {
+      name,
+      slug: slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
+      iconUrl: iconUrl || '',
+      isActive: true,
+    }
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        return await databases.createDocument(
+          appwriteConfig.databaseId,
+          appwriteConfig.categoriesCollectionId,
+          ID.unique(),
+          payload,
+        )
+      } catch (err: any) {
+        const errMsg = err?.message || ''
+        const match = errMsg.match(/Unknown attribute:\s*"([^"]+)"/i)
+        if (match && match[1]) {
+          const badKey = match[1]
+          console.warn(`[createCategory] Stripping unknown attribute "${badKey}"`)
+          delete payload[badKey]
+          continue
+        }
+        throw err
+      }
+    }
   } catch (e: any) {
     throw new Error(e.message || String(e))
   }
@@ -1401,19 +1519,44 @@ export const createCategory = async (name: string, slug?: string, iconUrl?: stri
 
 export const updateCategory = async (categoryId: string, categoryData: Partial<any>) => {
   try {
-    return await databases.updateDocument(
-      appwriteConfig.databaseId,
-      appwriteConfig.categoriesCollectionId,
-      categoryId,
-      categoryData,
-    )
+    let currentPayload: any = { ...categoryData }
+    delete currentPayload.$id
+    delete currentPayload.$createdAt
+    delete currentPayload.$updatedAt
+    delete currentPayload.$permissions
+    delete currentPayload.$databaseId
+    delete currentPayload.$collectionId
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        return await databases.updateDocument(
+          appwriteConfig.databaseId,
+          appwriteConfig.categoriesCollectionId,
+          categoryId,
+          currentPayload,
+        )
+      } catch (err: any) {
+        const errMsg = err?.message || ''
+        const match = errMsg.match(/Unknown attribute:\s*"([^"]+)"/i)
+        if (match && match[1]) {
+          const badKey = match[1]
+          console.warn(`[updateCategory] Stripping unknown attribute "${badKey}"`)
+          delete currentPayload[badKey]
+          continue
+        }
+        throw err
+      }
+    }
   } catch (e: any) {
     throw new Error(e.message || String(e))
   }
 }
 
-export const deleteCategory = async (categoryId: string) => {
+export const deleteCategory = async (categoryId: string, iconUrl?: string) => {
   try {
+    if (iconUrl) {
+      await deleteStorageFileByUrl(iconUrl).catch(() => { })
+    }
     return await databases.deleteDocument(
       appwriteConfig.databaseId,
       appwriteConfig.categoriesCollectionId,
@@ -1458,7 +1601,7 @@ export const createOrder = async (orderData: {
   deliveryDistanceKm?: number
   deliveryFee?: number
 }) => {
-  const payload: any = {
+  const fullPayload: any = {
     userId: orderData.userId,
     userName: orderData.userName,
     userEmail: orderData.userEmail,
@@ -1471,34 +1614,74 @@ export const createOrder = async (orderData: {
     createdAt: new Date().toISOString(),
   }
 
-  if (orderData.sellerId) payload.sellerId = orderData.sellerId
-  if (orderData.orderNotes && orderData.orderNotes.trim()) payload.orderNotes = orderData.orderNotes.trim()
-  if (orderData.storeLatitude != null) payload.storeLatitude = Number(orderData.storeLatitude)
-  if (orderData.storeLongitude != null) payload.storeLongitude = Number(orderData.storeLongitude)
-  if (orderData.customerLatitude != null) payload.customerLatitude = Number(orderData.customerLatitude)
-  if (orderData.customerLongitude != null) payload.customerLongitude = Number(orderData.customerLongitude)
-  if (orderData.deliveryDistanceKm != null) payload.deliveryDistanceKm = Number(orderData.deliveryDistanceKm)
-  if (orderData.deliveryFee != null) payload.deliveryFee = Number(orderData.deliveryFee)
+  if (orderData.sellerId) fullPayload.sellerId = orderData.sellerId
+  if (orderData.orderNotes && orderData.orderNotes.trim()) fullPayload.orderNotes = orderData.orderNotes.trim()
+  if (orderData.storeLatitude != null) fullPayload.storeLatitude = Number(orderData.storeLatitude)
+  if (orderData.storeLongitude != null) fullPayload.storeLongitude = Number(orderData.storeLongitude)
+  if (orderData.customerLatitude != null) fullPayload.customerLatitude = Number(orderData.customerLatitude)
+  if (orderData.customerLongitude != null) fullPayload.customerLongitude = Number(orderData.customerLongitude)
+  if (orderData.deliveryDistanceKm != null) fullPayload.deliveryDistanceKm = Number(orderData.deliveryDistanceKm)
+  if (orderData.deliveryFee != null) fullPayload.deliveryFee = Number(orderData.deliveryFee)
 
   try {
     return await databases.createDocument(
       appwriteConfig.databaseId,
       appwriteConfig.ordersCollectionId,
       ID.unique(),
-      payload,
+      fullPayload,
     )
   } catch (e: any) {
-    console.warn('createOrder initial attempt failed, retrying without optional orderNotes:', e?.message || e)
-    delete payload.orderNotes
+    const errorMsg = String(e?.message || e)
+    console.warn('createOrder initial attempt failed, cleaning optional schema attributes:', errorMsg)
+
+    // Parse unknown attribute name if Appwrite specified one (e.g. "Unknown attribute: \"storeLatitude\"")
+    const match = errorMsg.match(/Unknown attribute:\s*"([^"]+)"/i)
+    if (match && match[1]) {
+      const missingAttr = match[1]
+      delete fullPayload[missingAttr]
+    } else {
+      delete fullPayload.storeLatitude
+      delete fullPayload.storeLongitude
+      delete fullPayload.customerLatitude
+      delete fullPayload.customerLongitude
+      delete fullPayload.deliveryDistanceKm
+      delete fullPayload.deliveryFee
+      delete fullPayload.orderNotes
+    }
+
     try {
       return await databases.createDocument(
         appwriteConfig.databaseId,
         appwriteConfig.ordersCollectionId,
         ID.unique(),
-        payload,
+        fullPayload,
       )
-    } catch (err: any) {
-      throw new Error(err?.message || String(err))
+    } catch (err2: any) {
+      // Final fallback to core standard fields
+      const corePayload: any = {
+        userId: orderData.userId,
+        userName: orderData.userName,
+        userEmail: orderData.userEmail,
+        items: orderData.items,
+        totalAmount: Number(orderData.totalAmount),
+        deliveryAddress: orderData.deliveryAddress,
+        paymentReference: orderData.paymentReference,
+        paymentStatus: orderData.paymentStatus,
+        status: 'order_placed',
+        createdAt: new Date().toISOString(),
+      }
+      if (orderData.sellerId) corePayload.sellerId = orderData.sellerId
+
+      try {
+        return await databases.createDocument(
+          appwriteConfig.databaseId,
+          appwriteConfig.ordersCollectionId,
+          ID.unique(),
+          corePayload,
+        )
+      } catch (finalErr: any) {
+        throw new Error(finalErr?.message || String(finalErr))
+      }
     }
   }
 }
@@ -1665,39 +1848,46 @@ export const uploadAvatar = async (userId: string, userDocId: string, fileUri: s
 }
 
 // ----------------------------------------------------
+// ----------------------------------------------------
 // 👛 CUSTOMER WALLET FINANCIALS
 // ----------------------------------------------------
 export const getCustomerWallet = async (userId: string, altUserId?: string, userEmail?: string) => {
   try {
-    const idsToTry = [userId]
-    if (altUserId && altUserId !== userId) idsToTry.push(altUserId)
+    const idsToTry: string[] = []
+    if (userId) idsToTry.push(userId)
+    if (altUserId && !idsToTry.includes(altUserId)) idsToTry.push(altUserId)
     if (userEmail && !idsToTry.includes(userEmail)) idsToTry.push(userEmail)
 
+    // 1. Try direct queries
     for (const idToTest of idsToTry) {
       if (!idToTest) continue
       try {
         const docs = await databases.listDocuments(
           appwriteConfig.databaseId,
           appwriteConfig.walletsCollectionId,
-          [Query.equal('userId', idToTest)],
+          [Query.equal('userId', idToTest), Query.limit(1)],
         )
         if (docs && docs.documents && docs.documents.length > 0) {
           return docs.documents[0]
         }
       } catch (queryErr) {
-        console.warn('Wallet query with filter failed:', queryErr)
+        // Query might fail if index is not created
       }
     }
 
-    // Fallback: list documents and filter in memory
+    // 2. Fetch all wallets in collection to match in memory
     try {
       const allDocs = await databases.listDocuments(
         appwriteConfig.databaseId,
         appwriteConfig.walletsCollectionId,
+        [Query.limit(100)],
       )
       if (allDocs && allDocs.documents && allDocs.documents.length > 0) {
         const found = allDocs.documents.find((d: any) =>
-          idsToTry.includes(d.userId) || (userEmail && d.userEmail === userEmail)
+          idsToTry.includes(d.userId) ||
+          idsToTry.includes(d.accountId) ||
+          (userEmail && (d.userEmail === userEmail || d.email === userEmail)) ||
+          idsToTry.includes(d.$id)
         )
         if (found) return found
       }
@@ -1705,7 +1895,27 @@ export const getCustomerWallet = async (userId: string, altUserId?: string, user
       console.warn('Wallet fallback list failed:', listErr)
     }
 
-    // Auto-create wallet if non-existent
+    // 3. Check if user profile document in users collection has walletBalance
+    for (const idToTest of idsToTry) {
+      try {
+        const userDoc = await databases.getDocument(
+          appwriteConfig.databaseId,
+          appwriteConfig.userCollectionId,
+          idToTest,
+        )
+        if (userDoc && (userDoc.walletBalance != null || userDoc.balance != null)) {
+          const bal = Number(userDoc.walletBalance ?? userDoc.balance) || 0
+          return {
+            userId,
+            balance: bal,
+            currency: 'NGN',
+            $id: `user_doc_${idToTest}`,
+          }
+        }
+      } catch {}
+    }
+
+    // 4. Auto-create wallet if non-existent
     return await databases.createDocument(
       appwriteConfig.databaseId,
       appwriteConfig.walletsCollectionId,
@@ -1723,6 +1933,50 @@ export const getCustomerWallet = async (userId: string, altUserId?: string, user
   }
 }
 
+export const getAllCustomerWalletsMap = async (): Promise<Record<string, number>> => {
+  const map: Record<string, number> = {}
+
+  // 1. Fetch from wallets collection
+  try {
+    const res = await databases.listDocuments(
+      appwriteConfig.databaseId,
+      appwriteConfig.walletsCollectionId,
+      [Query.limit(100)],
+    )
+    for (const doc of res.documents || []) {
+      const bal = Number(doc.balance) || 0
+      if (doc.userId) map[doc.userId] = bal
+      if (doc.userEmail) map[doc.userEmail] = bal
+      if (doc.email) map[doc.email] = bal
+      if (doc.accountId) map[doc.accountId] = bal
+      if (doc.$id) map[doc.$id] = bal
+    }
+  } catch (e) {
+    console.warn('getAllCustomerWalletsMap wallets list failed:', e)
+  }
+
+  // 2. Fetch from users collection to catch any balances recorded directly
+  try {
+    const userRes = await databases.listDocuments(
+      appwriteConfig.databaseId,
+      appwriteConfig.userCollectionId,
+      [Query.limit(100)],
+    )
+    for (const u of userRes.documents || []) {
+      const bal = Number(u.walletBalance ?? u.balance) || 0
+      if (bal > 0) {
+        if (u.$id && map[u.$id] === undefined) map[u.$id] = bal
+        if (u.accountId && map[u.accountId] === undefined) map[u.accountId] = bal
+        if (u.email && map[u.email] === undefined) map[u.email] = bal
+      }
+    }
+  } catch (e) {
+    console.warn('getAllCustomerWalletsMap users list failed:', e)
+  }
+
+  return map
+}
+
 export const creditCustomerWallet = async (
   userId: string,
   amount: number,
@@ -1737,7 +1991,7 @@ export const creditCustomerWallet = async (
 
     let walletSaved = false
 
-    if (wallet && wallet.$id) {
+    if (wallet && wallet.$id && !wallet.$id.startsWith('user_doc_')) {
       try {
         await databases.updateDocument(
           appwriteConfig.databaseId,
@@ -1768,6 +2022,16 @@ export const creditCustomerWallet = async (
         console.error('Failed to create new wallet doc:', createErr)
       }
     }
+
+    // Also sync walletBalance directly to customer user doc
+    try {
+      await databases.updateDocument(
+        appwriteConfig.databaseId,
+        appwriteConfig.userCollectionId,
+        userId,
+        { walletBalance: newBalance },
+      )
+    } catch {}
 
     let tx: any = null
     try {
@@ -1824,7 +2088,7 @@ export const debitCustomerWallet = async (
     const newBalance = currentBal - Number(amount)
     let walletSaved = false
 
-    if (wallet && wallet.$id) {
+    if (wallet && wallet.$id && !wallet.$id.startsWith('user_doc_')) {
       try {
         await databases.updateDocument(
           appwriteConfig.databaseId,
@@ -1855,6 +2119,16 @@ export const debitCustomerWallet = async (
         console.error('Failed to create wallet doc on debit:', createErr)
       }
     }
+
+    // Also sync walletBalance directly to customer user doc
+    try {
+      await databases.updateDocument(
+        appwriteConfig.databaseId,
+        appwriteConfig.userCollectionId,
+        userId,
+        { walletBalance: newBalance },
+      )
+    } catch {}
 
     let tx: any = null
     try {
@@ -2272,6 +2546,7 @@ export interface DeliveryFeeSettings {
   distanceFarRate: number
   distancePerKmRate: number
   maxDeliveryRadiusKm: number
+  multiStorePickupFee: number
 }
 
 export const getDeliveryFeeSettings = async (): Promise<DeliveryFeeSettings> => {
@@ -2292,6 +2567,7 @@ export const getDeliveryFeeSettings = async (): Promise<DeliveryFeeSettings> => 
       distanceFarRate: Number(policy?.distanceFarRate != null ? policy.distanceFarRate : 1800),
       distancePerKmRate: Number(policy?.distancePerKmRate != null ? policy.distancePerKmRate : 150),
       maxDeliveryRadiusKm: Number(policy?.maxDeliveryRadiusKm != null ? policy.maxDeliveryRadiusKm : 20),
+      multiStorePickupFee: Number(policy?.multiStorePickupFee != null ? policy.multiStorePickupFee : 500),
     }
   } catch {
     return {
@@ -2309,6 +2585,7 @@ export const getDeliveryFeeSettings = async (): Promise<DeliveryFeeSettings> => 
       distanceFarRate: 1800,
       distancePerKmRate: 150,
       maxDeliveryRadiusKm: 20,
+      multiStorePickupFee: 500,
     }
   }
 }
@@ -2342,18 +2619,27 @@ export const calculateDynamicDeliveryFee = (
     distanceKm?: number
     userLocation?: { latitude: number; longitude: number }
     storeLocation?: { latitude: number; longitude: number }
+    storeCount?: number
   }
 ) => {
+  const storeCount = Math.max(1, options?.storeCount || 1)
+  const multiStoreSurcharge = storeCount > 1
+    ? (storeCount - 1) * Math.max(0, Number(settings.multiStorePickupFee != null ? settings.multiStorePickupFee : 500))
+    : 0
+
   // 1. Free Delivery check
   if (settings.freeDeliveryThreshold > 0 && subtotal >= settings.freeDeliveryThreshold) {
     return {
       baseFee: settings.deliveryFee,
       incrementalFee: 0,
-      totalDeliveryFee: 0,
-      isFree: true,
+      multiStoreSurcharge,
+      totalDeliveryFee: multiStoreSurcharge,
+      isFree: multiStoreSurcharge === 0,
       distanceKm: 0,
       isOutOfRange: false,
-      breakdownText: 'FREE Delivery (High-value order offer 🎉)',
+      breakdownText: multiStoreSurcharge > 0
+        ? `FREE Base Delivery + ₦${multiStoreSurcharge.toLocaleString()} multi-store pickup for ${storeCount} stores`
+        : 'FREE Delivery (High-value order offer 🎉)',
     }
   }
 
@@ -2407,14 +2693,16 @@ export const calculateDynamicDeliveryFee = (
 
   // 2. Base Coverage: Covers any order up to baseCoverageThreshold (e.g. ₦10,000)
   if (baseCoverage > 0 && subtotal <= baseCoverage) {
+    const totalFee = baseFee + multiStoreSurcharge
     return {
       baseFee,
       incrementalFee: 0,
-      totalDeliveryFee: baseFee,
+      multiStoreSurcharge,
+      totalDeliveryFee: totalFee,
       isFree: false,
       distanceKm,
       isOutOfRange,
-      breakdownText: `${isDistanceMode ? tierLabel : 'Base'} ₦${baseFee.toLocaleString()} (Covers orders up to ₦${baseCoverage.toLocaleString()})`,
+      breakdownText: `${isDistanceMode ? tierLabel : 'Base'} ₦${baseFee.toLocaleString()}${multiStoreSurcharge > 0 ? ` + ₦${multiStoreSurcharge.toLocaleString()} multi-store pickup` : ''}`,
     }
   }
 
@@ -2454,9 +2742,15 @@ export const calculateDynamicDeliveryFee = (
     breakdownText += ` (Capped at ₦${settings.maxDeliveryFee.toLocaleString()})`
   }
 
+  total += multiStoreSurcharge
+  if (multiStoreSurcharge > 0) {
+    breakdownText += ` + ₦${multiStoreSurcharge.toLocaleString()} multi-store pickup`
+  }
+
   return {
     baseFee,
     incrementalFee,
+    multiStoreSurcharge,
     totalDeliveryFee: Math.max(0, total),
     isFree: false,
     distanceKm,
@@ -2581,15 +2875,19 @@ export const getAppBranding = async () => {
   try {
     const policies: any = await getPlatformPolicies()
     return {
-      appName: policies?.appName || 'Grocery App',
+      appName: policies?.appName || '',
       appLogo: policies?.appLogo !== undefined ? policies.appLogo : null,
-      appTagline: policies?.appTagline || 'Fresh Groceries & Daily Essentials',
+      appTagline: policies?.appTagline || 'Fresh Finds & Daily Essentials',
+      loginGraphic: policies?.loginGraphic !== undefined ? policies.loginGraphic : null,
+      hideAuthLogo: Boolean(policies?.hideAuthLogo),
     }
   } catch {
     return {
-      appName: 'Grocery App',
+      appName: '',
       appLogo: null,
-      appTagline: 'Fresh Groceries & Daily Essentials',
+      appTagline: 'Fresh Finds & Daily Essentials',
+      loginGraphic: null,
+      hideAuthLogo: false,
     }
   }
 }
@@ -2598,6 +2896,572 @@ export const updateAppBranding = async (branding: {
   appName?: string
   appLogo?: string | null
   appTagline?: string
+  loginGraphic?: string | null
+  hideAuthLogo?: boolean
 }) => {
   return await updatePlatformPolicies(branding)
 }
+
+// ----------------------------------------------------
+// ⭐ STORE RATINGS & CUSTOMER REVIEWS ENGINE
+// ----------------------------------------------------
+let localReviewsStore: any[] = []
+
+export const createStoreReview = async ({
+  orderId,
+  storeId,
+  userId,
+  userName,
+  userAvatar,
+  rating,
+  comment = '',
+}: {
+  orderId: string
+  storeId: string
+  userId: string
+  userName: string
+  userAvatar?: string
+  rating: number
+  comment?: string
+}) => {
+  try {
+    const validRating = Math.max(1, Math.min(5, Math.round(Number(rating) || 5)))
+    const newReview = {
+      orderId,
+      storeId,
+      userId,
+      userName: userName || 'Customer',
+      userAvatar: userAvatar || '',
+      rating: validRating,
+      comment: comment.trim(),
+      createdAt: new Date().toISOString(),
+    }
+
+    let createdDoc: any = null
+
+    try {
+      createdDoc = await databases.createDocument(
+        appwriteConfig.databaseId,
+        appwriteConfig.storeReviewsCollectionId,
+        ID.unique(),
+        newReview,
+      )
+    } catch (e) {
+      console.warn('Appwrite store review collection create failed, storing locally:', e)
+      createdDoc = {
+        $id: `rev_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        ...newReview,
+      }
+    }
+
+    // Always maintain in-memory cache
+    localReviewsStore.unshift(createdDoc)
+
+    // Mark order as rated
+    try {
+      await databases.updateDocument(
+        appwriteConfig.databaseId,
+        appwriteConfig.ordersCollectionId,
+        orderId,
+        {
+          isRated: true,
+          reviewRating: validRating,
+          reviewComment: comment.trim(),
+        },
+      )
+    } catch (orderUpdErr) {
+      console.warn('Could not update order isRated flag:', orderUpdErr)
+    }
+
+    // Recalculate Store Cumulative Average Rating & Total Reviews
+    try {
+      const allStoreReviews = await getStoreReviews(storeId)
+      const count = allStoreReviews.length
+      const sum = allStoreReviews.reduce((acc, r) => acc + (Number(r.rating) || 5), 0)
+      const avg = count > 0 ? Math.round((sum / count) * 10) / 10 : 5.0
+
+      await updateStoreProfile(storeId, {
+        rating: avg,
+        totalReviews: count,
+      })
+    } catch (storeUpdErr) {
+      console.warn('Could not update store cumulative rating:', storeUpdErr)
+    }
+
+    return createdDoc
+  } catch (err: any) {
+    console.error('Error creating store review:', err)
+    throw new Error(err.message || 'Failed to submit review.')
+  }
+}
+
+export const getStoreReviews = async (storeId: string) => {
+  try {
+    let dbReviews: any[] = []
+    try {
+      const res = await databases.listDocuments(
+        appwriteConfig.databaseId,
+        appwriteConfig.storeReviewsCollectionId,
+        [Query.equal('storeId', storeId), Query.orderDesc('createdAt'), Query.limit(100)],
+      )
+      if (res?.documents) dbReviews = res.documents
+    } catch {
+      // Gracefully fall back to local cache if collection is not yet configured
+    }
+
+    // Merge with localReviewsStore
+    const localMatches = localReviewsStore.filter((r) => r.storeId === storeId)
+    const combinedMap = new Map<string, any>()
+
+    for (const r of [...dbReviews, ...localMatches]) {
+      if (r.$id) combinedMap.set(r.$id, r)
+    }
+
+    return Array.from(combinedMap.values()).sort(
+      (a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    )
+  } catch (e) {
+    console.error('Error getting store reviews:', e)
+    return localReviewsStore.filter((r) => r.storeId === storeId)
+  }
+}
+
+export const getAllStoreReviews = async () => {
+  try {
+    let dbReviews: any[] = []
+    try {
+      const res = await databases.listDocuments(
+        appwriteConfig.databaseId,
+        appwriteConfig.storeReviewsCollectionId,
+        [Query.orderDesc('createdAt'), Query.limit(100)],
+      )
+      if (res?.documents) dbReviews = res.documents
+    } catch {
+      // Gracefully fall back to local cache if collection is not yet configured
+    }
+
+    const combinedMap = new Map<string, any>()
+    for (const r of [...dbReviews, ...localReviewsStore]) {
+      if (r.$id) combinedMap.set(r.$id, r)
+    }
+
+    return Array.from(combinedMap.values()).sort(
+      (a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    )
+  } catch (e) {
+    return localReviewsStore
+  }
+}
+
+export const getOrderReview = async (orderId: string) => {
+  try {
+    const all = await getAllStoreReviews()
+    return all.find((r) => r.orderId === orderId) || null
+  } catch {
+    return null
+  }
+}
+
+export const deleteStoreReview = async (reviewId: string, storeId: string) => {
+  try {
+    try {
+      await databases.deleteDocument(
+        appwriteConfig.databaseId,
+        appwriteConfig.storeReviewsCollectionId,
+        reviewId,
+      )
+    } catch (e) {
+      console.warn('Appwrite review delete document fallback:', e)
+    }
+
+    localReviewsStore = localReviewsStore.filter((r) => r.$id !== reviewId)
+
+    // Recalculate store cumulative rating
+    try {
+      const remaining = await getStoreReviews(storeId)
+      const count = remaining.length
+      const sum = remaining.reduce((acc, r) => acc + (Number(r.rating) || 5), 0)
+      const avg = count > 0 ? Math.round((sum / count) * 10) / 10 : 5.0
+
+      await updateStoreProfile(storeId, {
+        rating: avg,
+        totalReviews: count,
+      })
+    } catch (err) {
+      console.warn('Error recalculating store rating after deletion:', err)
+    }
+
+    return true
+  } catch (e: any) {
+    console.error('Error deleting store review:', e)
+    throw new Error(e.message || 'Failed to delete review.')
+  }
+}
+
+// ----------------------------------------------------
+// 📊 COMPREHENSIVE FINANCIAL ANALYTICS & PAYOUT SUITE
+// ----------------------------------------------------
+
+let localPayoutRequests: any[] = []
+
+export const getAdminFinancialAnalytics = async () => {
+  try {
+    const [orders, stores, payouts, wallets, users] = await Promise.all([
+      getAllOrders().catch(() => []),
+      getStores().catch(() => []),
+      getSellerPayoutLogs().catch(() => []),
+      databases
+        .listDocuments(appwriteConfig.databaseId, appwriteConfig.walletsCollectionId, [Query.limit(100)])
+        .then((r) => r.documents || [])
+        .catch(() => []),
+      databases
+        .listDocuments(appwriteConfig.databaseId, appwriteConfig.userCollectionId, [Query.limit(100)])
+        .then((r) => r.documents || [])
+        .catch(() => []),
+    ])
+
+    // Combine remote payouts with local payouts
+    const allPayouts = Array.from(
+      new Map([...payouts, ...localPayoutRequests].map((p) => [p.$id, p])).values()
+    )
+
+    // Total Customer Wallets Balance
+    const totalCustomerWalletsBalance = wallets.reduce(
+      (sum: number, w: any) => sum + (Number(w.balance) || 0),
+      0
+    )
+
+    // Non-cancelled orders for Gross Merchandise Value (GMV)
+    const validOrders = orders.filter((o: any) => {
+      const s = String(o.status || '').toLowerCase()
+      return !['cancelled', 'canceled', 'refunded', 'rejected'].includes(s)
+    })
+
+    const totalPlatformGMV = validOrders.reduce(
+      (sum: number, o: any) => sum + (Number(o.totalAmount) || 0),
+      0
+    )
+
+    // Store-by-store breakdown
+    const storeMap = new Map<string, any>()
+    for (const st of stores) {
+      const sId = st.$id || st.id
+      storeMap.set(sId, {
+        storeId: sId,
+        storeName: st.storeName || 'Store',
+        logoUrl: st.logoUrl || null,
+        commissionRate: Number(st.commissionRate) || 10.0,
+        grossSales: 0,
+        commissionPaid: 0,
+        netEarnings: 0,
+        totalPaidOut: 0,
+        pendingPayouts: 0,
+        ordersCount: 0,
+        rating: st.rating || 5.0,
+        totalReviews: st.totalReviews || 0,
+        bankName: st.bankName || '',
+        accountNumber: st.accountNumber || '',
+        accountName: st.accountName || '',
+      })
+    }
+
+    // Attribute order totals & commission to respective stores
+    for (const o of validOrders) {
+      const orderAmount = Number(o.totalAmount) || 0
+      const sId = o.sellerId || (o.items && typeof o.items === 'string' && o.items.includes('sellerId') ? null : null)
+      
+      const targetStoreId = sId || (stores[0]?.$id || 'store_1')
+      let storeData = storeMap.get(targetStoreId)
+      if (!storeData && stores.length > 0) {
+        storeData = storeMap.get(stores[0].$id)
+      }
+
+      if (storeData) {
+        const commRate = storeData.commissionRate || 10.0
+        const comm = (orderAmount * commRate) / 100
+        storeData.grossSales += orderAmount
+        storeData.commissionPaid += comm
+        storeData.netEarnings += orderAmount - comm
+        storeData.ordersCount += 1
+      }
+    }
+
+    // Calculate payouts per store
+    let totalPayoutsPaid = 0
+    let totalPayoutsPending = 0
+
+    for (const p of allPayouts) {
+      const pAmt = Number(p.amount) || 0
+      const status = String(p.status || '').toLowerCase()
+      const sId = p.sellerId
+      const storeData = storeMap.get(sId)
+
+      if (['completed', 'approved', 'paid'].includes(status)) {
+        totalPayoutsPaid += pAmt
+        if (storeData) storeData.totalPaidOut += pAmt
+      } else if (status === 'pending') {
+        totalPayoutsPending += pAmt
+        if (storeData) storeData.pendingPayouts += pAmt
+      }
+    }
+
+    const totalPlatformCommission = Array.from(storeMap.values()).reduce(
+      (sum, s) => sum + s.commissionPaid,
+      0
+    )
+
+    const totalStoreNetEarnings = Array.from(storeMap.values()).reduce(
+      (sum, s) => sum + s.netEarnings,
+      0
+    )
+
+    return {
+      totalPlatformGMV,
+      totalPlatformCommission,
+      totalStoreNetEarnings,
+      totalPayoutsPaid,
+      totalPayoutsPending,
+      totalCustomerWalletsBalance,
+      totalOrdersCount: validOrders.length,
+      totalStoresCount: stores.length,
+      totalCustomersCount: users.length,
+      storeBreakdown: Array.from(storeMap.values()),
+      recentPayouts: allPayouts.sort(
+        (a, b) => new Date(b.createdAt || b.requestedAt || 0).getTime() - new Date(a.createdAt || a.requestedAt || 0).getTime()
+      ),
+    }
+  } catch (err) {
+    console.error('Error generating admin financial analytics:', err)
+    return {
+      totalPlatformGMV: 0,
+      totalPlatformCommission: 0,
+      totalStoreNetEarnings: 0,
+      totalPayoutsPaid: 0,
+      totalPayoutsPending: 0,
+      totalCustomerWalletsBalance: 0,
+      totalOrdersCount: 0,
+      totalStoresCount: 0,
+      totalCustomersCount: 0,
+      storeBreakdown: [],
+      recentPayouts: [],
+    }
+  }
+}
+
+export const getSellerFinancialSummary = async (sellerStoreId: string) => {
+  try {
+    const [orders, store, payouts] = await Promise.all([
+      getSellerOrders(sellerStoreId).catch(() => []),
+      getStoreById(sellerStoreId).catch(() => null),
+      getSellerPayoutLogs(sellerStoreId).catch(() => []),
+    ])
+
+    const allPayouts = Array.from(
+      new Map([...payouts, ...localPayoutRequests.filter((p) => p.sellerId === sellerStoreId)].map((p) => [p.$id, p])).values()
+    )
+
+    const commissionRate = Number((store as any)?.commissionRate) || 10.0
+
+    const validOrders = orders.filter((o: any) => {
+      const s = String(o.status || '').toLowerCase()
+      return !['cancelled', 'canceled', 'refunded', 'rejected'].includes(s)
+    })
+
+    const grossSales = validOrders.reduce((sum: number, o: any) => sum + (Number(o.totalAmount) || 0), 0)
+    const commissionDeducted = (grossSales * commissionRate) / 100
+    const netEarnings = grossSales - commissionDeducted
+
+    let totalPaidOut = 0
+    let totalPendingPayout = 0
+
+    for (const p of allPayouts) {
+      const amt = Number(p.amount) || 0
+      const st = String(p.status || '').toLowerCase()
+      if (['completed', 'approved', 'paid'].includes(st)) {
+        totalPaidOut += amt
+      } else if (st === 'pending') {
+        totalPendingPayout += amt
+      }
+    }
+
+    const availableBalance = Math.max(0, netEarnings - totalPaidOut - totalPendingPayout)
+
+    return {
+      grossSales,
+      commissionRate,
+      commissionDeducted,
+      netEarnings,
+      totalPaidOut,
+      totalPendingPayout,
+      availableBalance,
+      totalOrders: validOrders.length,
+      payoutsHistory: allPayouts.sort(
+        (a, b) => new Date(b.createdAt || b.requestedAt || 0).getTime() - new Date(a.createdAt || a.requestedAt || 0).getTime()
+      ),
+    }
+  } catch (err) {
+    console.error('Error fetching seller financial summary:', err)
+    return {
+      grossSales: 0,
+      commissionRate: 10.0,
+      commissionDeducted: 0,
+      netEarnings: 0,
+      totalPaidOut: 0,
+      totalPendingPayout: 0,
+      availableBalance: 0,
+      totalOrders: 0,
+      payoutsHistory: [],
+    }
+  }
+}
+
+export const requestSellerPayout = async ({
+  sellerId,
+  storeName,
+  amount,
+  bankName,
+  accountNumber,
+  accountName,
+  paymentMethod = 'Bank Transfer',
+}: {
+  sellerId: string
+  storeName: string
+  amount: number
+  bankName: string
+  accountNumber: string
+  accountName: string
+  paymentMethod?: string
+}) => {
+  try {
+    const summary = await getSellerFinancialSummary(sellerId)
+    const numAmount = Number(amount)
+
+    if (numAmount <= 0) {
+      throw new Error('Please enter a valid payout amount greater than ₦0.')
+    }
+
+    if (numAmount > summary.availableBalance) {
+      throw new Error(
+        `Requested amount (₦${numAmount.toLocaleString()}) exceeds your available payout balance of ₦${summary.availableBalance.toLocaleString()}.`
+      )
+    }
+
+    const payoutData = {
+      sellerId,
+      storeName: storeName || 'Seller Store',
+      amount: numAmount,
+      status: 'pending',
+      paymentMethod,
+      bankName: bankName.trim(),
+      accountNumber: accountNumber.trim(),
+      accountName: accountName.trim(),
+      reference: `PAY_REQ_${Date.now()}`,
+      requestedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    }
+
+    let createdDoc: any = null
+    try {
+      createdDoc = await databases.createDocument(
+        appwriteConfig.databaseId,
+        appwriteConfig.sellerPayoutsCollectionId,
+        ID.unique(),
+        payoutData,
+      )
+    } catch (e) {
+      console.warn('Appwrite seller payout create failed, saving to local cache:', e)
+      createdDoc = {
+        $id: `payout_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        ...payoutData,
+      }
+    }
+
+    localPayoutRequests.unshift(createdDoc)
+    return createdDoc
+  } catch (err: any) {
+    console.error('Error requesting seller payout:', err)
+    throw new Error(err.message || 'Failed to submit payout request.')
+  }
+}
+
+export const updatePayoutStatus = async (
+  payoutId: string,
+  status: 'approved' | 'completed' | 'rejected',
+  notes?: string
+) => {
+  try {
+    const payload: any = {
+      status,
+      processedAt: new Date().toISOString(),
+    }
+    if (notes) payload.notes = notes
+
+    let updatedDoc: any = null
+    try {
+      updatedDoc = await databases.updateDocument(
+        appwriteConfig.databaseId,
+        appwriteConfig.sellerPayoutsCollectionId,
+        payoutId,
+        payload,
+      )
+    } catch (e) {
+      console.warn('Appwrite update payout failed, updating local cache:', e)
+    }
+
+    // Update in local cache as well
+    const foundIdx = localPayoutRequests.findIndex((p) => p.$id === payoutId)
+    if (foundIdx !== -1) {
+      localPayoutRequests[foundIdx] = { ...localPayoutRequests[foundIdx], ...payload }
+      updatedDoc = localPayoutRequests[foundIdx]
+    }
+
+    return updatedDoc || { $id: payoutId, ...payload }
+  } catch (err: any) {
+    console.error('Error updating payout status:', err)
+    throw new Error(err.message || 'Failed to update payout status.')
+  }
+}
+
+export const getAllCustomerWalletsWithProfiles = async () => {
+  try {
+    const [usersRes, walletsRes] = await Promise.all([
+      databases
+        .listDocuments(appwriteConfig.databaseId, appwriteConfig.userCollectionId, [Query.limit(100)])
+        .then((r) => r.documents || [])
+        .catch(() => []),
+      databases
+        .listDocuments(appwriteConfig.databaseId, appwriteConfig.walletsCollectionId, [Query.limit(100)])
+        .then((r) => r.documents || [])
+        .catch(() => []),
+    ])
+
+    const walletMap = new Map<string, any>()
+    for (const w of walletsRes) {
+      if (w.userId) walletMap.set(w.userId, w)
+      if (w.userEmail) walletMap.set(w.userEmail, w)
+    }
+
+    const customersWithWallets = usersRes
+      .filter((u: any) => u.role !== 'admin')
+      .map((u: any) => {
+        const uId = u.$id || u.accountId || ''
+        const wallet = walletMap.get(uId) || walletMap.get(u.email) || { balance: 0.0, currency: 'NGN' }
+        return {
+          userId: uId,
+          name: u.name || 'Customer',
+          email: u.email || '',
+          phone: u.phone || 'Not provided',
+          avatar: u.avatar || '',
+          status: u.status || (u.isBlocked ? 'suspended' : 'active'),
+          walletBalance: Number(wallet.balance) || 0.0,
+          walletUpdatedAt: wallet.updatedAt || wallet.$updatedAt || '',
+        }
+      })
+
+    return customersWithWallets.sort((a, b) => b.walletBalance - a.walletBalance)
+  } catch (err) {
+    console.error('Error fetching customer wallets with profiles:', err)
+    return []
+  }
+}
+

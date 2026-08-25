@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 type OnboardingState = {
   hasCompletedOnboarding: boolean
@@ -6,10 +8,18 @@ type OnboardingState = {
   resetOnboarding: () => void
 }
 
-export const useOnboardingStore = create<OnboardingState>((set) => ({
-  hasCompletedOnboarding: false,
-  completeOnboarding: () => set({ hasCompletedOnboarding: true }),
-  resetOnboarding: () => set({ hasCompletedOnboarding: false }),
-}))
+export const useOnboardingStore = create<OnboardingState>()(
+  persist(
+    (set) => ({
+      hasCompletedOnboarding: false,
+      completeOnboarding: () => set({ hasCompletedOnboarding: true }),
+      resetOnboarding: () => set({ hasCompletedOnboarding: false }),
+    }),
+    {
+      name: 'grocery-onboarding-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+    }
+  )
+)
 
 export default useOnboardingStore

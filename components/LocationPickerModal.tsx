@@ -7,15 +7,18 @@ import {
   Keyboard,
   Modal,
   Platform,
+  StatusBar,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from 'react-native'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import MapView, { Marker, PROVIDER_DEFAULT, PROVIDER_GOOGLE } from 'react-native-maps'
 import * as Location from 'expo-location'
 import { useLocationStore } from '@/store/location.store'
+import Searchbar from '@/components/SearchBar'
 import { images } from '@/constants'
 
 const DEFAULT_COORDS = { latitude: 6.5244, longitude: 3.3792 } // Lagos, Nigeria fallback
@@ -50,7 +53,7 @@ class MapErrorBoundary extends React.Component<
       return (
         this.props.fallback || (
           <View className="flex-1 items-center justify-center p-6 bg-gray-50">
-            <Text className="text-4xl mb-2 font-quicksand-bold">📍</Text>
+            <Image source={images.location} className="w-10 h-10 mb-2" resizeMode="contain" />
             <Text className="text-base font-quicksand-bold text-dark-100 text-center mb-1">
               Map View Unavailable
             </Text>
@@ -298,65 +301,78 @@ export default function LocationPickerModal({
     Alert.alert('Address Saved!', `Location saved as your ${label} address.`)
   }
 
+  const insets = useSafeAreaInsets()
+  const topInset = Math.max(insets.top || 0, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0)
+  const bottomInset = Math.max(insets.bottom || 0, Platform.OS === 'ios' ? 16 : 12)
+
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent={true}
+    >
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <View className="flex-1 bg-white">
-          {/* Header Bar */}
-          <View className="pt-12 pb-3 px-5 border-b-2 border-primary/10 flex-row items-center justify-between bg-white z-10">
-            <TouchableOpacity onPress={onClose} activeOpacity={0.7} className="p-1">
-              <Image source={images.arrowBack} className="size-5" resizeMode="contain" />
-            </TouchableOpacity>
+          {/* Header Bar - Respects Top Safe Area (Status bar & Notch on Android/iOS) */}
+          <View
+            style={{
+              paddingTop: topInset,
+              backgroundColor: '#ffffff',
+              borderBottomColor: '#F1F1F1',
+            }}
+            className="bg-white z-10 border-b border-[#F1F1F1]"
+          >
+            <View className="py-3 px-5 flex-row items-center justify-between">
+              <TouchableOpacity onPress={onClose} activeOpacity={0.7} className="p-1">
+                <Image source={images.arrowBack} className="size-5" resizeMode="contain" />
+              </TouchableOpacity>
 
-            <View className="items-center flex-1 mx-3">
-              <Text className="text-lg font-quicksand-bold text-dark-100">
-                Select Delivery Location
-              </Text>
-              {titleNote ? (
-                <Text className="text-xs font-quicksand-medium text-primary">{titleNote}</Text>
-              ) : (
-                <Text className="text-xs font-quicksand-medium text-gray-400">
-                  Search or drag pin on map
+              <View className="items-center flex-1 mx-3">
+                <Text className="text-lg font-quicksand-bold text-dark-100">
+                  Select Delivery Location
                 </Text>
-              )}
-            </View>
+                {titleNote ? (
+                  <Text className="text-xs font-quicksand-medium text-primary" style={{ color: '#53B175' }}>{titleNote}</Text>
+                ) : (
+                  <Text className="text-xs font-quicksand-medium text-gray-400">
+                    Search or drag pin on map
+                  </Text>
+                )}
+              </View>
 
-            <View className="size-5" />
+              <View className="size-5" />
+            </View>
           </View>
 
-          {/* Search Bar Input */}
-          <View className="p-4 bg-white z-20 shadow-sm border-b-2 border-primary/10">
-            <View className="flex-row items-center bg-white border-2 border-primary/10 rounded-full px-4 py-2.5 shadow-md shadow-black/10">
-              <Text className="text-base mr-2">🔍</Text>
-              <TextInput
-                placeholder="Search street, area, city or landmark..."
-                value={search}
-                onChangeText={setSearch}
-                placeholderTextColor="#9CA3AF"
-                className="flex-1 font-quicksand-semibold text-sm text-dark-100"
-              />
-              {isSearching && <ActivityIndicator size="small" color="#53B175" />}
-              {search.length > 0 && !isSearching && (
-                <TouchableOpacity onPress={() => setSearch('')}>
-                  <Text className="text-gray-400 font-bold px-2">✕</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+          {/* Search Bar Input matching Home screen design */}
+          <View className="px-5 py-3 bg-white z-20 shadow-sm border-b border-[#F1F1F1]" style={{ backgroundColor: '#ffffff', borderBottomColor: '#F1F1F1' }}>
+            <Searchbar
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search street, area, city or landmark..."
+              isLoading={isSearching}
+            />
 
-            {/* Autocomplete Predictions List */}
+            {/* Autocomplete Predictions List - Styled to match Home screen */}
             {predictions.length > 0 && (
-              <View className="bg-white rounded-3xl mt-2 border-2 border-primary/10 max-h-48 shadow-xl">
+              <View className="bg-white rounded-[24px] mt-2.5 border border-[#F1F1F1] max-h-56 shadow-2xl overflow-hidden" style={{ backgroundColor: '#ffffff', borderColor: '#F1F1F1' }}>
                 <FlatList
                   data={predictions}
                   keyExtractor={(_, index) => index.toString()}
                   keyboardShouldPersistTaps="handled"
-                  renderItem={({ item }) => (
+                  renderItem={({ item, index }) => (
                     <TouchableOpacity
                       onPress={() => handleSelectPrediction(item)}
-                      className="p-3.5 border-b border-gray-100 flex-row items-center"
+                      activeOpacity={0.7}
+                      className={`p-3.5 flex-row items-center ${index < predictions.length - 1 ? 'border-b border-[#F1F1F1]' : ''}`}
+                      style={{ borderBottomColor: '#F1F1F1' }}
                     >
-                      <Text className="text-base mr-2">📍</Text>
-                      <Text className="flex-1 font-quicksand-medium text-xs text-dark-100">
+                      <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center mr-3 border border-primary/20">
+                        <Image source={images.location} className="w-4 h-4" resizeMode="contain" />
+                      </View>
+                      <Text className="flex-1 font-quicksand-semibold text-xs text-dark-100 leading-snug" numberOfLines={2}>
                         {item.display_name}
                       </Text>
                     </TouchableOpacity>
@@ -395,7 +411,7 @@ export default function LocationPickerModal({
             <TouchableOpacity
               onPress={fetchGPSLocation}
               disabled={isLocatingUser}
-              className="absolute bottom-4 right-4 bg-white p-3.5 rounded-full shadow-lg border-2 border-primary/10 flex-row items-center justify-center active:opacity-80 z-10"
+              className="absolute bottom-4 right-4 bg-white p-3.5 rounded-full shadow-lg border border-primary/20 flex-row items-center justify-center active:opacity-80 z-10"
             >
               {isLocatingUser ? (
                 <ActivityIndicator size="small" color="#53B175" />
@@ -405,59 +421,69 @@ export default function LocationPickerModal({
             </TouchableOpacity>
           </View>
 
-          {/* Selected Address Preview & Confirm Bar */}
-          <View className="p-5 bg-white border-t-2 border-primary/10 shadow-2xl">
-            <View className="flex-row items-start mb-3">
-              <View className="w-9 h-9 rounded-full bg-primary/10 items-center justify-center mr-3 mt-0.5 border border-primary/20">
-                <Text className="text-base">📍</Text>
-              </View>
-              <View className="flex-1">
-                <Text className="text-xs font-quicksand-semibold text-gray-400 uppercase tracking-wider">
-                  Selected Address
-                </Text>
-                {isGeocoding ? (
-                  <View className="flex-row items-center mt-1">
-                    <ActivityIndicator size="small" color="#53B175" className="mr-2" />
-                    <Text className="text-gray-400 font-quicksand-medium text-sm">
-                      Fetching address details...
-                    </Text>
-                  </View>
-                ) : (
-                  <Text
-                    className="text-sm font-quicksand-bold text-dark-100 mt-0.5"
-                    numberOfLines={2}
-                  >
-                    {selectedAddress}
+          {/* Selected Address Preview & Confirm Bar - Respects Bottom Safe Area */}
+          <View
+            style={{
+              paddingBottom: bottomInset,
+              backgroundColor: '#ffffff',
+              borderTopColor: '#F1F1F1',
+            }}
+            className="bg-white border-t border-[#F1F1F1] shadow-2xl"
+          >
+            <View className="p-5">
+              <View className="flex-row items-start mb-3">
+                <View className="w-9 h-9 rounded-full bg-primary/10 items-center justify-center mr-3 mt-0.5 border border-primary/20">
+                  <Image source={images.location} className="w-4 h-4" resizeMode="contain" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-xs font-quicksand-semibold text-gray-400 uppercase tracking-wider">
+                    Selected Address
                   </Text>
-                )}
+                  {isGeocoding ? (
+                    <View className="flex-row items-center mt-1">
+                      <ActivityIndicator size="small" color="#53B175" className="mr-2" />
+                      <Text className="text-gray-400 font-quicksand-medium text-sm">
+                        Fetching address details...
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text
+                      className="text-sm font-quicksand-bold text-dark-100 mt-0.5"
+                      numberOfLines={2}
+                    >
+                      {selectedAddress}
+                    </Text>
+                  )}
+                </View>
               </View>
-            </View>
 
-            {/* Quick Save Buttons */}
-            <View className="flex-row gap-2 mb-3">
+              {/* Quick Save Buttons */}
+              <View className="flex-row gap-2 mb-3">
+                <TouchableOpacity
+                  onPress={() => handleSaveAsLabel('Home')}
+                  className="flex-1 bg-primary/10 border border-primary/30 py-2.5 rounded-full items-center"
+                >
+                  <Text className="text-primary font-quicksand-bold text-xs" style={{ color: '#53B175' }}>🏠 Save as Home</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => handleSaveAsLabel('Work')}
+                  className="flex-1 bg-primary/10 border border-primary/30 py-2.5 rounded-full items-center"
+                >
+                  <Text className="text-primary font-quicksand-bold text-xs" style={{ color: '#53B175' }}>💼 Save as Work</Text>
+                </TouchableOpacity>
+              </View>
+
               <TouchableOpacity
-                onPress={() => handleSaveAsLabel('Home')}
-                className="flex-1 bg-primary/10 border border-primary/30 py-2.5 rounded-full items-center"
+                onPress={handleConfirm}
+                className="bg-primary py-3.5 rounded-full items-center justify-center shadow-lg shadow-primary/30 active:opacity-90"
+                style={{ backgroundColor: '#53B175' }}
               >
-                <Text className="text-primary font-quicksand-bold text-xs">🏠 Save as Home</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => handleSaveAsLabel('Work')}
-                className="flex-1 bg-primary/10 border border-primary/30 py-2.5 rounded-full items-center"
-              >
-                <Text className="text-primary font-quicksand-bold text-xs">💼 Save as Work</Text>
+                <Text className="text-white font-quicksand-bold text-base">
+                  Use Current Location
+                </Text>
               </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              onPress={handleConfirm}
-              className="bg-primary py-3.5 rounded-full items-center justify-center shadow-lg shadow-primary/30 active:opacity-90"
-            >
-              <Text className="text-white font-quicksand-bold text-base">
-                Use Current Location
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
       </TouchableWithoutFeedback>

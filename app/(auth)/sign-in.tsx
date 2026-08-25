@@ -3,7 +3,7 @@ import CustomInput from '@/components/CustomInput'
 import { signIn, account } from '@/lib/appwrite'
 import { Link, router } from 'expo-router'
 import { useState, useEffect } from 'react'
-import { Alert, Platform, Text, View } from 'react-native'
+import { Alert, Text, View } from 'react-native'
 import * as Sentry from '@sentry/react-native'
 import useAuthStore from '@/store/auth.store'
 import useOnboardingStore from '@/store/onboarding.store'
@@ -28,7 +28,7 @@ const SignIn = () => {
           router.replace('/(tabs)')
         }
       } catch {
-        if (Platform.OS !== 'web' && !hasCompletedOnboarding) {
+        if (!hasCompletedOnboarding) {
           router.replace('/onboarding' as any)
         }
       }
@@ -101,9 +101,7 @@ const SignIn = () => {
       }
     } catch (error: any) {
       Alert.alert('Error', error.message)
-      if (Platform.OS !== 'web') {
-        try { Sentry.captureException(error) } catch {}
-      }
+      Sentry.captureException(error)
     } finally {
       setIsSubmitting(false)
     }
@@ -135,12 +133,6 @@ const SignIn = () => {
         </Text>
         <Link href="/sign-up" className="base-bold text-primary">
           Sign Up
-        </Link>
-      </View>
-      <View className="flex justify-center mt-2 flex-row gap-1">
-        <Text className="base-regular text-gray-400">Want a tour?</Text>
-        <Link href={"/onboarding" as any} className="base-bold text-gray-700 underline">
-          View Onboarding
         </Link>
       </View>
     </View>

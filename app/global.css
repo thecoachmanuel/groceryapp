@@ -50,11 +50,11 @@ html, body, #root {
   }
 
   .label {
-    @apply text-base text-start w-full font-quicksand-medium text-gray-500 pl-2;
+    @apply text-base text-start w-full font-quicksand-medium text-gray-500 mb-1;
   }
 
   .input {
-    @apply rounded-lg p-3 w-full text-base font-quicksand-semibold text-dark-100 border-b leading-5;
+    @apply py-3 w-full text-lg font-quicksand-semibold text-dark-100 border-b border-[#F1F1F1] leading-6;
   }
 
   .filter {
@@ -62,7 +62,7 @@ html, body, #root {
   }
 
   .menu-card {
-    @apply relative py-9 px-3.5 pt-24 flex items-center justify-end bg-white shadow-md shadow-black/10 rounded-3xl;
+    @apply relative py-9 px-3.5 pt-24 flex items-center justify-end bg-white border border-[#F1F1F1] rounded-3xl;
   }
 
   .profile-field {
@@ -74,7 +74,7 @@ html, body, #root {
   }
 
   .searchbar {
-    @apply relative flex flex-row items-center justify-center w-full bg-white shadow-md shadow-black/10 rounded-full  font-quicksand-medium text-dark-100 gap-5;
+    @apply relative flex flex-row items-center justify-center w-full bg-white border border-[#F1F1F1] rounded-full font-quicksand-medium text-dark-100 gap-5;
   }
 
   .tab-icon {
@@ -82,7 +82,7 @@ html, body, #root {
   }
 
   .offer-card {
-    @apply w-full h-48 my-3 rounded-xl overflow-hidden shadow-lg flex items-center gap-5;
+    @apply w-full h-48 my-3 rounded-xl overflow-hidden flex items-center gap-5;
   }
 
   .offer-card__info {

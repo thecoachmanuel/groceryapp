@@ -1,17 +1,19 @@
 import { images } from '@/constants'
 import React, { useRef } from 'react'
-import { Image, TextInput, TouchableOpacity, View, Platform } from 'react-native'
+import { ActivityIndicator, Image, Text, TextInput, TouchableOpacity, View, Platform } from 'react-native'
 
 interface SearchBarProps {
   value?: string
   onChangeText?: (text: string) => void
   placeholder?: string
+  isLoading?: boolean
 }
 
 const Searchbar = ({
   value = '',
   onChangeText,
   placeholder = "Search fresh groceries, fruits, milk...",
+  isLoading = false,
 }: SearchBarProps) => {
   const inputRef = useRef<TextInput>(null)
 
@@ -57,20 +59,17 @@ const Searchbar = ({
         keyboardType="default"
       />
 
-      {value.length > 0 && (
+      {isLoading ? (
+        <ActivityIndicator size="small" color="#53B175" className="ml-2" />
+      ) : value.length > 0 ? (
         <TouchableOpacity
           onPress={handleClear}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          className="ml-2 bg-primary/10 p-1.5 rounded-full items-center justify-center"
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          className="ml-3 items-center justify-center"
         >
-          <Image
-            source={(images as any).close || images.trash}
-            className="w-3.5 h-3.5"
-            resizeMode="contain"
-            tintColor="#53B175"
-          />
+          <Text style={{ fontSize: 18, color: '#9CA3AF', lineHeight: 20, fontWeight: '600' }}>✕</Text>
         </TouchableOpacity>
-      )}
+      ) : null}
     </View>
   )
 }

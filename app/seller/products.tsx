@@ -25,7 +25,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 export default function SellerProducts() {
 
@@ -221,6 +221,9 @@ export default function SellerProducts() {
     ])
   }
 
+  const insets = useSafeAreaInsets()
+  const bottomInset = Math.max(insets.bottom || 0, 16)
+
   return (
     <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
       {/* Header */}
@@ -258,7 +261,8 @@ export default function SellerProducts() {
         <FlatList
           data={products}
           keyExtractor={(item) => item.$id}
-          contentContainerClassName="p-5 pb-32"
+          contentContainerClassName="p-5"
+          contentContainerStyle={{ paddingBottom: bottomInset + 32 }}
           ListEmptyComponent={() => (
             <View className="items-center mt-20 px-8">
               <Text className="text-4xl mb-3">📦</Text>
@@ -281,10 +285,10 @@ export default function SellerProducts() {
           renderItem={({ item }) => {
             const hasWeightVars = item.weightVariants && JSON.parse(item.weightVariants).length > 0
             return (
-              <View className="bg-white rounded-[28px] p-4 mb-4 flex-row items-center border border-primary/10 shadow-md">
+              <View className="bg-white rounded-none p-4 mb-4 flex-row items-center border border-primary/10 shadow-md">
                 <Image
                   source={{ uri: item.image_url }}
-                  className="w-20 h-20 rounded-2xl bg-gray-100 mr-4"
+                  className="w-20 h-20 rounded-none bg-gray-100 mr-4"
                   resizeMode="cover"
                 />
 

@@ -1,6 +1,9 @@
+import CartButton from '@/components/CartButton'
+import { images } from '@/constants'
 import { account, appwriteConfig, updateUserProfile, uploadAvatar } from '@/lib/appwrite'
 import useAuthStore from '@/store/auth.store'
 import useBrandingStore from '@/store/branding.store'
+import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
 import React, { useState } from 'react'
@@ -10,16 +13,20 @@ import {
   Image,
   Keyboard,
   Modal,
+  Platform,
   ScrollView,
+  StatusBar,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 const Profile = () => {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const { user, isLoading, fetchAuthenticatedUser, role, isAdmin, isSeller } = useAuthStore()
   const { appName } = useBrandingStore()
   const [loggingOut, setLoggingOut] = useState(false)
@@ -28,7 +35,6 @@ const Profile = () => {
   const [editName, setEditName] = useState('')
   const [editPhone, setEditPhone] = useState('')
   const [isSavingProfile, setIsSavingProfile] = useState(false)
-  const [addressModalVisible, setAddressModalVisible] = useState(false)
 
   // Secret Admin Access State
   const [adminModalVisible, setAdminModalVisible] = useState(false)
@@ -60,11 +66,9 @@ const Profile = () => {
           (user as any)?.$id || '',
           result.assets[0].uri,
         )
-        // 1. Immediately update user in local auth store
         if (user) {
           useAuthStore.getState().setUser({ ...user, avatar: newAvatarUrl })
         }
-        // 2. Refresh authenticated user silently so screen stays on Account page without reset
         await fetchAuthenticatedUser(true)
         Alert.alert('Success', 'Profile avatar updated!')
       }
@@ -86,7 +90,6 @@ const Profile = () => {
   }
 
   const handleAdminVerify = () => {
-
     if (adminPin === targetPin || user?.email === adminEmail || isAdmin) {
       setAdminModalVisible(false)
       setAdminPin('')
@@ -118,6 +121,10 @@ const Profile = () => {
     ])
   }
 
+  const tabBottomOffset = Platform.OS === 'ios'
+    ? Math.max(insets.bottom || 0, 12)
+    : (insets.bottom > 0 ? insets.bottom : 0)
+
   if (isLoading || !user) {
     return (
       <View className="flex-1 items-center justify-center bg-white" style={{ backgroundColor: '#ffffff' }}>
@@ -134,71 +141,102 @@ const Profile = () => {
   const isSellerUser = isSeller || (user as any).role === 'seller'
 
   return (
-    <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
-      <ScrollView contentContainerStyle={{ padding: 20, alignItems: 'center', paddingBottom: 100 }}>
-        <View className="bg-white w-full rounded-3xl p-6 items-center shadow-lg shadow-black/10 border border-primary/10">
-          {/* Avatar Container with Upload Badge */}
-          <TouchableOpacity
-            onPress={handlePickAvatar}
-            onLongPress={() => setAdminModalVisible(true)}
-            disabled={uploadingAvatar}
-            className="relative w-32 h-32 rounded-full overflow-hidden shadow-md shadow-black/20 mb-3 border-4 border-primary/20 bg-gray-100 items-center justify-center"
-          >
-            {uploadingAvatar ? (
-              <View className="w-full h-full bg-black/40 justify-center items-center">
-                <ActivityIndicator color="#fff" />
+    <View className="flex-1 bg-white relative" style={{ backgroundColor: '#ffffff' }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+
+      {/* ── Viewport Bounded Content Container ── */}
+      <View style={{ flex: 1, marginBottom: tabBottomOffset }} className="overflow-hidden">
+        {/* Header matching Find Products Page design */}
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View className="pt-2 pb-2 bg-white border-b border-[#F1F1F1]" style={{ backgroundColor: '#ffffff', borderColor: '#F1F1F1' }}>
+            <SafeAreaView edges={['top']} className="bg-white px-5 pt-2 pb-2" style={{ backgroundColor: '#ffffff' }}>
+              {/* Top Title Row */}
+              <View className="flex-row items-center justify-between mb-1">
+                <View>
+                  <Text className="text-2xl font-quicksand-bold font-bold text-dark-100">
+                    My Account
+                  </Text>
+                  <Text className="text-xs font-quicksand-medium text-gray-400 mt-0.5">
+                    Manage orders, wallet & personal profile
+                  </Text>
+                </View>
               </View>
-            ) : (
-              <Image
-                source={{ uri: avatarUrl }}
-                className="w-full h-full"
-                style={{ width: '100%', height: '100%', borderRadius: 9999 }}
-                resizeMode="cover"
-              />
-            )}
-            <View className="absolute bottom-0 left-0 right-0 py-1 items-center" style={{ backgroundColor: '#53B175' }}>
-              <Text className="text-white text-[10px] font-bold">📷 EDIT</Text>
-            </View>
-          </TouchableOpacity>
+            </SafeAreaView>
+          </View>
+        </TouchableWithoutFeedback>
 
-          <Text className="text-2xl font-quicksand-bold text-dark-100">
-            {user.name}
-          </Text>
-          <Text className="text-gray-400 mt-0.5 text-sm font-quicksand-medium">{user.email}</Text>
+        {/* Scrollable Profile Settings Body */}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 110 }}
+        >
+          {/* User Profile Card */}
+          <View className="bg-white rounded-3xl p-5 items-center border border-[#F1F1F1] mb-5" style={{ borderColor: '#F1F1F1' }}>
+            {/* Avatar Container with Edit Badge */}
+            <TouchableOpacity
+              onPress={handlePickAvatar}
+              onLongPress={() => setAdminModalVisible(true)}
+              disabled={uploadingAvatar}
+              className="relative w-24 h-24 rounded-full overflow-hidden mb-3 border-2 border-primary/20 bg-gray-50 items-center justify-center"
+            >
+              {uploadingAvatar ? (
+                <View className="w-full h-full bg-black/40 justify-center items-center">
+                  <ActivityIndicator color="#fff" />
+                </View>
+              ) : (
+                <Image
+                  source={{ uri: avatarUrl }}
+                  className="w-full h-full"
+                  style={{ width: '100%', height: '100%', borderRadius: 9999 }}
+                  resizeMode="cover"
+                />
+              )}
+              <View className="absolute bottom-0 left-0 right-0 py-0.5 items-center" style={{ backgroundColor: '#53B175' }}>
+                <Text className="text-white text-[9px] font-quicksand-bold">📷 EDIT</Text>
+              </View>
+            </TouchableOpacity>
 
-          {/* Role Badge */}
-          <View className="mt-2 px-4 py-1.5 rounded-full border" style={{ backgroundColor: 'rgba(83, 177, 117, 0.1)', borderColor: 'rgba(83, 177, 117, 0.25)' }}>
-            <Text className="font-quicksand-bold text-xs uppercase tracking-wider" style={{ color: '#53B175' }}>
-              {isAdminUser ? '👑 App Owner (Admin)' : isSellerUser ? '🏪 Seller Partner' : '🛒 Customer Account'}
+            <Text className="text-xl font-quicksand-bold font-bold text-dark-100 text-center">
+              {user.name}
             </Text>
+            <Text className="text-gray-400 text-xs font-quicksand-medium mt-0.5">{user.email}</Text>
+
+            {/* Role Badge */}
+            {(isAdminUser || isSellerUser) && (
+              <View className="mt-2 px-3 py-1 rounded-full border flex-row items-center" style={{ backgroundColor: 'rgba(83, 177, 117, 0.08)', borderColor: 'rgba(83, 177, 117, 0.2)' }}>
+                <Text className="font-quicksand-bold text-[11px] uppercase tracking-wide" style={{ color: '#53B175' }}>
+                  {isAdminUser ? '👑 App Owner (Admin)' : '🏪 Seller Partner'}
+                </Text>
+              </View>
+            )}
+
+            {/* Edit Profile Button */}
+            <TouchableOpacity
+              onPress={() => {
+                setEditName(user.name)
+                setEditPhone((user as any).phone || '')
+                setEditProfileVisible(true)
+              }}
+              className="mt-3 px-4 py-1.5 rounded-full border flex-row items-center active:scale-95"
+              style={{ backgroundColor: 'rgba(83, 177, 117, 0.08)', borderColor: 'rgba(83, 177, 117, 0.2)' }}
+            >
+              <Text className="font-quicksand-bold text-xs" style={{ color: '#53B175' }}>✏️ Edit Profile</Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Edit Profile Button */}
-          <TouchableOpacity
-            onPress={() => {
-              setEditName(user.name)
-              setEditPhone((user as any).phone || '')
-              setEditProfileVisible(true)
-            }}
-            className="mt-4 px-5 py-2 rounded-full border flex-row items-center"
-            style={{ backgroundColor: 'rgba(83, 177, 117, 0.1)', borderColor: 'rgba(83, 177, 117, 0.3)' }}
-          >
-            <Text className="font-quicksand-bold text-xs mr-1.5" style={{ color: '#53B175' }}>✏️ Edit Profile</Text>
-          </TouchableOpacity>
-
-          {/* Quick Actions */}
-          <View className="w-full mt-6 gap-3">
-            {/* Admin Control Panel Access (Only for logged in Admin) */}
+          {/* Quick Action Navigation Cards */}
+          <View className="gap-3">
+            {/* Admin Control Panel Access */}
             {isAdminUser && (
               <TouchableOpacity
-                activeOpacity={0.85}
+                activeOpacity={0.88}
                 onPress={() => router.push('/admin/dashboard' as any)}
-                className="border-2 p-4 rounded-[28px] flex-row justify-between items-center shadow-lg mb-1"
-                style={{ backgroundColor: 'rgba(83, 177, 117, 0.1)', borderColor: 'rgba(83, 177, 117, 0.4)', shadowColor: '#53B175' }}
+                className="bg-primary/10 border border-primary/30 p-3.5 rounded-2xl flex-row justify-between items-center mb-1"
+                style={{ backgroundColor: 'rgba(83, 177, 117, 0.08)', borderColor: 'rgba(83, 177, 117, 0.3)' }}
               >
                 <View className="flex-row items-center flex-1 mr-2">
-                  <View className="w-10 h-10 rounded-2xl items-center justify-center mr-3 border" style={{ backgroundColor: 'rgba(83, 177, 117, 0.2)', borderColor: 'rgba(83, 177, 117, 0.3)' }}>
-                    <Text className="text-xl">👑</Text>
+                  <View className="w-10 h-10 rounded-xl bg-primary/20 items-center justify-center mr-3">
+                    <Text className="text-lg">👑</Text>
                   </View>
                   <View className="flex-1">
                     <Text className="font-quicksand-bold text-sm" style={{ color: '#53B175' }}>
@@ -215,66 +253,75 @@ const Profile = () => {
               </TouchableOpacity>
             )}
 
-            {/* Customer My Orders Button */}
+            {/* My Orders */}
             <TouchableOpacity
               onPress={() => router.push('/orders' as any)}
-              className="bg-white border-2 border-primary/10 p-4 rounded-[28px] flex-row justify-between items-center shadow-lg shadow-black/10"
+              className="bg-white border border-[#F1F1F1] p-3.5 rounded-2xl flex-row justify-between items-center"
+              style={{ borderColor: '#F1F1F1' }}
             >
               <View className="flex-row items-center">
-                <Text className="text-xl mr-3">📦</Text>
+                <View className="w-10 h-10 rounded-xl bg-gray-50 items-center justify-center mr-3 border border-[#F1F1F1]">
+                  <Text className="text-lg">📦</Text>
+                </View>
                 <View>
-                  <Text className="font-quicksand-bold text-dark-100 text-sm">
-                    My Orders History
+                  <Text className="font-quicksand-bold font-bold text-dark-100 text-sm">
+                    Orders
                   </Text>
-                  <Text className="text-gray-400 font-quicksand-medium text-xs">
+                  <Text className="text-gray-400 font-quicksand-medium text-xs mt-0.5">
                     Track ongoing & past orders live
                   </Text>
                 </View>
               </View>
-              <Text className="font-bold text-lg" style={{ color: '#53B175' }}>→</Text>
+              <Text className="font-quicksand-bold font-bold text-sm" style={{ color: '#53B175' }}>→</Text>
             </TouchableOpacity>
 
-            {/* Customer Wallet & Financials */}
+            {/* Wallet */}
             <TouchableOpacity
               onPress={() => router.push('/wallet' as any)}
-              className="bg-white border-2 border-primary/10 p-4 rounded-[28px] flex-row justify-between items-center shadow-lg shadow-black/10"
+              className="bg-white border border-[#F1F1F1] p-3.5 rounded-2xl flex-row justify-between items-center"
+              style={{ borderColor: '#F1F1F1' }}
             >
               <View className="flex-row items-center">
-                <Text className="text-xl mr-3">👛</Text>
+                <View className="w-10 h-10 rounded-xl bg-gray-50 items-center justify-center mr-3 border border-[#F1F1F1]">
+                  <Text className="text-lg">👛</Text>
+                </View>
                 <View>
-                  <Text className="font-quicksand-bold text-dark-100 text-sm">
-                    My Digital Wallet & Balance
+                  <Text className="font-quicksand-bold font-bold text-dark-100 text-sm">
+                    My Wallet
                   </Text>
-                  <Text className="text-gray-400 font-quicksand-medium text-xs">
+                  <Text className="text-gray-400 font-quicksand-medium text-xs mt-0.5">
                     Fund wallet & view transaction history
                   </Text>
                 </View>
               </View>
-              <Text className="font-bold text-lg" style={{ color: '#53B175' }}>→</Text>
+              <Text className="font-quicksand-bold font-bold text-sm" style={{ color: '#53B175' }}>→</Text>
             </TouchableOpacity>
 
-            {/* Saved Delivery Addresses */}
+            {/* Delivery Address */}
             <TouchableOpacity
               onPress={() => router.push('/address' as any)}
-              className="bg-white border-2 border-primary/10 p-4 rounded-[28px] flex-row justify-between items-center shadow-lg shadow-black/10"
+              className="bg-white border border-[#F1F1F1] p-3.5 rounded-2xl flex-row justify-between items-center"
+              style={{ borderColor: '#F1F1F1' }}
             >
               <View className="flex-row items-center">
-                <Text className="text-xl mr-3">🏠</Text>
+                <View className="w-10 h-10 rounded-xl bg-gray-50 items-center justify-center mr-3 border border-[#F1F1F1]">
+                  <Text className="text-lg">🏠</Text>
+                </View>
                 <View>
-                  <Text className="font-quicksand-bold text-dark-100 text-sm">
-                    Saved Delivery Addresses
+                  <Text className="font-quicksand-bold font-bold text-dark-100 text-sm">
+                    Delivery Address
                   </Text>
-                  <Text className="text-gray-400 font-quicksand-medium text-xs">
-                    Manage 🏠 Home, 💼 Work & custom locations
+                  <Text className="text-gray-400 font-quicksand-medium text-xs mt-0.5">
+                    Manage Home, Work & custom locations
                   </Text>
                 </View>
               </View>
-              <Text className="font-bold text-lg" style={{ color: '#53B175' }}>→</Text>
+              <Text className="font-quicksand-bold font-bold text-sm" style={{ color: '#53B175' }}>→</Text>
             </TouchableOpacity>
 
-            {/* Help & Information Section */}
-            <View className="mt-4 mb-1">
-              <Text className="text-xs font-quicksand-bold text-gray-400 uppercase tracking-widest px-1">
+            {/* Help & Information Section Title */}
+            <View className="mt-3 mb-0.5">
+              <Text className="text-[11px] font-quicksand-bold font-bold text-gray-400 uppercase tracking-wider px-1">
                 Help & Information
               </Text>
             </View>
@@ -282,103 +329,115 @@ const Profile = () => {
             {/* FAQ */}
             <TouchableOpacity
               onPress={() => router.push('/menu/faq' as any)}
-              className="bg-white border-2 border-primary/10 p-4 rounded-[28px] flex-row justify-between items-center shadow-lg shadow-black/10"
+              className="bg-white border border-[#F1F1F1] p-3.5 rounded-2xl flex-row justify-between items-center"
+              style={{ borderColor: '#F1F1F1' }}
             >
               <View className="flex-row items-center">
-                <Text className="text-xl mr-3">❓</Text>
+                <View className="w-10 h-10 rounded-xl bg-gray-50 items-center justify-center mr-3 border border-[#F1F1F1]">
+                  <Text className="text-lg">❓</Text>
+                </View>
                 <View>
-                  <Text className="font-quicksand-bold text-dark-100 text-sm">
-                    Frequently Asked Questions
+                  <Text className="font-quicksand-bold font-bold text-dark-100 text-sm">
+                    Help & FAQs
                   </Text>
-                  <Text className="text-gray-400 font-quicksand-medium text-xs">
+                  <Text className="text-gray-400 font-quicksand-medium text-xs mt-0.5">
                     Delivery, payments & order help
                   </Text>
                 </View>
               </View>
-              <Text className="font-bold text-lg" style={{ color: '#53B175' }}>→</Text>
+              <Text className="font-quicksand-bold font-bold text-sm" style={{ color: '#53B175' }}>→</Text>
             </TouchableOpacity>
 
-            {/* About Us */}
+            {/* About */}
             <TouchableOpacity
               onPress={() => router.push('/menu/about' as any)}
-              className="bg-white border-2 border-primary/10 p-4 rounded-[28px] flex-row justify-between items-center shadow-lg shadow-black/10"
+              className="bg-white border border-[#F1F1F1] p-3.5 rounded-2xl flex-row justify-between items-center"
+              style={{ borderColor: '#F1F1F1' }}
             >
               <View className="flex-row items-center">
-                <Text className="text-xl mr-3">ℹ️</Text>
+                <View className="w-10 h-10 rounded-xl bg-gray-50 items-center justify-center mr-3 border border-[#F1F1F1]">
+                  <Text className="text-lg">ℹ️</Text>
+                </View>
                 <View>
-                  <Text className="font-quicksand-bold text-dark-100 text-sm">
-                    About {appName}
+                  <Text className="font-quicksand-bold font-bold text-dark-100 text-sm">
+                    About
                   </Text>
-                  <Text className="text-gray-400 font-quicksand-medium text-xs">
+                  <Text className="text-gray-400 font-quicksand-medium text-xs mt-0.5">
                     Our story, mission & app details
                   </Text>
                 </View>
               </View>
-              <Text className="font-bold text-lg" style={{ color: '#53B175' }}>→</Text>
+              <Text className="font-quicksand-bold font-bold text-sm" style={{ color: '#53B175' }}>→</Text>
             </TouchableOpacity>
 
-            {/* Help & Support */}
+            {/* Contact Support */}
             <TouchableOpacity
               onPress={() => router.push('/menu/contact' as any)}
-              className="bg-white border-2 border-primary/10 p-4 rounded-[28px] flex-row justify-between items-center shadow-lg shadow-black/10"
+              className="bg-white border border-[#F1F1F1] p-3.5 rounded-2xl flex-row justify-between items-center"
+              style={{ borderColor: '#F1F1F1' }}
             >
               <View className="flex-row items-center">
-                <Text className="text-xl mr-3">🎧</Text>
+                <View className="w-10 h-10 rounded-xl bg-gray-50 items-center justify-center mr-3 border border-[#F1F1F1]">
+                  <Text className="text-lg">🎧</Text>
+                </View>
                 <View>
-                  <Text className="font-quicksand-bold text-dark-100 text-sm">
-                    Help & Support
+                  <Text className="font-quicksand-bold font-bold text-dark-100 text-sm">
+                    Contact Support
                   </Text>
-                  <Text className="text-gray-400 font-quicksand-medium text-xs">
+                  <Text className="text-gray-400 font-quicksand-medium text-xs mt-0.5">
                     Contact support, email or call us
                   </Text>
                 </View>
               </View>
-              <Text className="font-bold text-lg" style={{ color: '#53B175' }}>→</Text>
+              <Text className="font-quicksand-bold font-bold text-sm" style={{ color: '#53B175' }}>→</Text>
             </TouchableOpacity>
 
             {/* Terms & Privacy */}
             <TouchableOpacity
               onPress={() => router.push('/menu/terms' as any)}
-              className="bg-white border-2 border-primary/10 p-4 rounded-[28px] flex-row justify-between items-center shadow-lg shadow-black/10"
+              className="bg-white border border-[#F1F1F1] p-3.5 rounded-2xl flex-row justify-between items-center mb-2"
+              style={{ borderColor: '#F1F1F1' }}
             >
               <View className="flex-row items-center">
-                <Text className="text-xl mr-3">📜</Text>
+                <View className="w-10 h-10 rounded-xl bg-gray-50 items-center justify-center mr-3 border border-[#F1F1F1]">
+                  <Text className="text-lg">📜</Text>
+                </View>
                 <View>
-                  <Text className="font-quicksand-bold text-dark-100 text-sm">
+                  <Text className="font-quicksand-bold font-bold text-dark-100 text-sm">
                     Terms & Privacy Policy
                   </Text>
-                  <Text className="text-gray-400 font-quicksand-medium text-xs">
+                  <Text className="text-gray-400 font-quicksand-medium text-xs mt-0.5">
                     Legal terms & privacy protection
                   </Text>
                 </View>
               </View>
-              <Text className="font-bold text-lg" style={{ color: '#53B175' }}>→</Text>
+              <Text className="font-quicksand-bold font-bold text-sm" style={{ color: '#53B175' }}>→</Text>
             </TouchableOpacity>
 
+            {/* Logout Button */}
             <TouchableOpacity
               onPress={handleLogout}
               disabled={loggingOut}
-              className="bg-red-500 p-4 rounded-2xl w-full items-center justify-center shadow-md shadow-red-500/20"
+              className="bg-red-500 py-3.5 px-4 rounded-2xl w-full items-center justify-center active:scale-98 mt-2"
             >
               {loggingOut ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text className="text-white font-quicksand-bold text-base">
-                  Logout
+                <Text className="text-white font-quicksand-bold text-sm">
+                  Logout Account
                 </Text>
               )}
             </TouchableOpacity>
           </View>
 
-
           {/* Footer - Secret 5-tap Admin trigger */}
-          <TouchableOpacity onPress={handleVersionTap} className="mt-8 items-center">
-            <Text className="text-gray-300 font-quicksand-medium text-xs">
+          <TouchableOpacity onPress={handleVersionTap} className="mt-6 items-center">
+            <Text className="text-gray-400 font-quicksand-medium text-xs">
               {appName} v1.0.0 • 2026
             </Text>
           </TouchableOpacity>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </View>
 
       {/* Secret Admin Passcode Modal */}
       <Modal
@@ -391,7 +450,6 @@ const Profile = () => {
         }}
       >
         <View className="flex-1 bg-black/60 justify-center items-center px-6">
-          {/* Backdrop Tap to Close */}
           <TouchableOpacity
             activeOpacity={1}
             onPress={() => {
@@ -401,7 +459,7 @@ const Profile = () => {
             className="absolute inset-0"
           />
 
-          <View className="bg-white rounded-3xl p-6 w-full max-w-sm items-center shadow-2xl z-10">
+          <View className="bg-white rounded-3xl p-6 w-full max-w-sm items-center z-10 border border-[#F1F1F1]" style={{ borderColor: '#F1F1F1' }}>
             <Text className="text-3xl mb-2">🔐</Text>
             <Text className="text-xl font-quicksand-bold text-dark-100 mb-1">
               App Owner Gatekeeper
@@ -433,6 +491,7 @@ const Profile = () => {
               <TouchableOpacity
                 onPress={handleAdminVerify}
                 className="flex-1 bg-primary py-3 rounded-full items-center"
+                style={{ backgroundColor: '#53B175' }}
               >
                 <Text className="text-white font-quicksand-bold">Unlock</Text>
               </TouchableOpacity>
@@ -441,7 +500,7 @@ const Profile = () => {
         </View>
       </Modal>
 
-      {/* Edit Profile Modal (Read-Only Email Protection — Pure Light Mode Design) */}
+      {/* Edit Profile Modal */}
       <Modal
         visible={editProfileVisible}
         transparent
@@ -451,8 +510,7 @@ const Profile = () => {
           setEditProfileVisible(false)
         }}
       >
-        <View className="flex-1 bg-slate-900/40 justify-center items-center px-5">
-          {/* Backdrop Tap to Close */}
+        <View className="flex-1 bg-black/50 justify-center items-center px-5">
           <TouchableOpacity
             activeOpacity={1}
             onPress={() => {
@@ -462,7 +520,7 @@ const Profile = () => {
             className="absolute inset-0"
           />
 
-          <View className="bg-white rounded-3xl p-6 w-full max-w-sm border-2 border-primary/20 shadow-2xl z-10">
+          <View className="bg-white rounded-3xl p-6 w-full max-w-sm border border-[#F1F1F1] z-10" style={{ borderColor: '#F1F1F1' }}>
             <Text className="text-lg font-quicksand-bold text-dark-100 mb-1">
               Edit Account Profile
             </Text>
@@ -477,7 +535,8 @@ const Profile = () => {
               onChangeText={setEditName}
               placeholder="Your full name"
               placeholderTextColor="#9CA3AF"
-              className="bg-white border-2 border-primary/10 rounded-2xl px-4 py-2.5 font-quicksand-semibold text-sm mb-3 text-dark-100 shadow-sm shadow-black/5"
+              className="bg-white border border-[#F1F1F1] rounded-2xl px-4 py-2.5 font-quicksand-semibold text-sm mb-3 text-dark-100"
+              style={{ borderColor: '#F1F1F1' }}
             />
 
             {/* Phone Number Input */}
@@ -488,12 +547,13 @@ const Profile = () => {
               keyboardType="phone-pad"
               placeholder="e.g. +234 801 234 5678"
               placeholderTextColor="#9CA3AF"
-              className="bg-white border-2 border-primary/10 rounded-2xl px-4 py-2.5 font-quicksand-semibold text-sm mb-3 text-dark-100 shadow-sm shadow-black/5"
+              className="bg-white border border-[#F1F1F1] rounded-2xl px-4 py-2.5 font-quicksand-semibold text-sm mb-3 text-dark-100"
+              style={{ borderColor: '#F1F1F1' }}
             />
 
-            {/* Locked Email Field (Read-Only for Customer) */}
+            {/* Locked Email Field */}
             <Text className="text-xs font-quicksand-bold text-gray-400 mb-1">Email Address 🔒</Text>
-            <View className="bg-gray-50 border-2 border-primary/10 rounded-2xl px-4 py-2.5 mb-1 flex-row items-center justify-between">
+            <View className="bg-gray-50 border border-[#F1F1F1] rounded-2xl px-4 py-2.5 mb-1 flex-row items-center justify-between" style={{ borderColor: '#F1F1F1' }}>
               <Text className="font-quicksand-semibold text-sm text-gray-600">{user.email}</Text>
               <Text className="text-xs text-gray-400 font-bold">🔒 LOCKED</Text>
             </View>
@@ -505,9 +565,9 @@ const Profile = () => {
             <View className="flex-row gap-3">
               <TouchableOpacity
                 onPress={() => setEditProfileVisible(false)}
-                className="flex-1 bg-red-500/10 border-2 border-red-500/20 py-3 rounded-full items-center active:opacity-80"
+                className="flex-1 bg-gray-100 py-3 rounded-full items-center active:opacity-80"
               >
-                <Text className="text-red-600 font-quicksand-bold text-xs">Cancel</Text>
+                <Text className="text-gray-700 font-quicksand-bold text-xs">Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -533,6 +593,7 @@ const Profile = () => {
                 }}
                 disabled={isSavingProfile}
                 className="flex-1 bg-primary py-3 rounded-full items-center justify-center"
+                style={{ backgroundColor: '#53B175' }}
               >
                 {isSavingProfile ? (
                   <ActivityIndicator size="small" color="#fff" />
@@ -544,7 +605,7 @@ const Profile = () => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   )
 }
 

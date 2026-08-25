@@ -33,6 +33,7 @@ export default function ProductDetail() {
   const addItem = useCartStore((s) => s.addItem)
 
   const [item, setItem] = useState<any>(null)
+  const [storeDoc, setStoreDoc] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [selectedCustomizations, setSelectedCustomizations] = useState<any[]>([])
   const [selectedWeightVariant, setSelectedWeightVariant] = useState<any>(null)
@@ -45,13 +46,20 @@ export default function ProductDetail() {
         setLoading(true)
         const data = await getMenuItemById(id)
         setItem(data)
+
+        if (data?.sellerId || data?.storeId) {
+          const { getStoreById } = await import('@/lib/appwrite')
+          const st = await getStoreById(data.sellerId || data.storeId).catch(() => null)
+          if (st) setStoreDoc(st)
+        }
+
         if (data?.weightVariants) {
           try {
             const parsed = JSON.parse(data.weightVariants)
             if (Array.isArray(parsed) && parsed.length > 0) {
               setSelectedWeightVariant(parsed[0])
             }
-          } catch {}
+          } catch { }
         }
       } catch (err) {
         console.error('Error fetching product:', err)
@@ -167,14 +175,30 @@ export default function ProductDetail() {
               <Text className="text-2xl font-quicksand-bold text-dark-100">
                 {item.name}
               </Text>
-              <View className="flex-row items-center mt-2">
-                <Text className="text-yellow-500 font-quicksand-bold text-base mr-1">
-                  ★ {item.rating || 4.8}
-                </Text>
-                <Text className="text-gray-400 font-quicksand-medium text-sm">
-                  (120+ reviews)
-                </Text>
-              </View>
+              {(() => {
+                const liveRating = item.rating != null && Number(item.rating) > 0
+                  ? Number(item.rating).toFixed(1)
+                  : storeDoc?.rating != null && Number(storeDoc.rating) > 0
+                    ? Number(storeDoc.rating).toFixed(1)
+                    : '5.0'
+
+                const liveReviewsCount = item.totalReviews != null && Number(item.totalReviews) > 0
+                  ? `${item.totalReviews} product review${Number(item.totalReviews) > 1 ? 's' : ''}`
+                  : storeDoc?.totalReviews != null && Number(storeDoc.totalReviews) > 0
+                    ? `${storeDoc.totalReviews} store review${Number(storeDoc.totalReviews) > 1 ? 's' : ''}`
+                    : 'Top Rated Product'
+
+                return (
+                  <View className="flex-row items-center mt-2">
+                    <Text className="text-yellow-500 font-quicksand-bold text-base mr-1.5">
+                      ★ {liveRating}
+                    </Text>
+                    <Text className="text-gray-400 font-quicksand-medium text-xs">
+                      ({liveReviewsCount})
+                    </Text>
+                  </View>
+                )
+              })()}
             </View>
             <View className="items-end">
               {isItemOnSale ? (
@@ -294,10 +318,11 @@ export default function ProductDetail() {
           style={{ backgroundColor: '#53B175' }}
         >
           <Text className="text-white font-quicksand-bold text-base">
-            Add to Cart • ₦ {totalPrice.toLocaleString()}
+            Add to Basket • ₦ {totalPrice.toLocaleString()}
           </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   )
 }
+

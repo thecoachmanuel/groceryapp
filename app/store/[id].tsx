@@ -2,6 +2,7 @@ import CartButton from '@/components/CartButton'
 import FastImage from '@/components/FastImage'
 import FloatingCartPill from '@/components/FloatingCartPill'
 import MenuCard from '@/components/MenuCard'
+import Searchbar from '@/components/SearchBar'
 import { images } from '@/constants'
 import { calculateEstimatedDeliveryTime, calculateHaversineDistanceKm, getProductsByStore, getStoreById } from '@/lib/appwrite'
 import { useLocationStore } from '@/store/location.store'
@@ -144,7 +145,7 @@ export default function StoreDetail() {
 
             {/* Store Profile Card (Overlapping Banner) */}
             <View className="px-5 -mt-10">
-              <View className="bg-white rounded-[32px] p-5 shadow-xl shadow-black/10 border border-primary/10">
+              <View className="bg-white rounded-[32px] p-5 border border-[#F1F1F1]" style={{ borderColor: '#F1F1F1' }}>
                 <View className="flex-row items-center mb-3">
                   {logoSource ? (
                     <FastImage
@@ -161,12 +162,19 @@ export default function StoreDetail() {
                   )}
 
                   <View className="flex-1 pr-2">
-                    <View className="flex-row items-center flex-wrap gap-1">
+                    <View className="flex-row items-center flex-wrap gap-1.5">
                       <Text className="text-xl font-quicksand-bold text-dark-100" numberOfLines={1}>
                         {store.storeName}
                       </Text>
+                      <View className="bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 flex-row items-center">
+                        <Text className="text-[10px] mr-0.5">⭐</Text>
+                        <Text className="font-quicksand-bold text-[10px] text-amber-800">
+                          {store.rating != null && Number(store.rating) > 0 ? Number(store.rating).toFixed(1) : '5.0'}
+                          {store.totalReviews ? ` (${store.totalReviews})` : ''}
+                        </Text>
+                      </View>
                       <View className="bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
-                        <Text className="font-quicksand-bold text-[10px] text-primary">Verified Store 🏪</Text>
+                        <Text className="font-quicksand-bold text-[10px] text-primary" style={{ color: '#53B175' }}>Verified Partner ✓</Text>
                       </View>
                     </View>
                     <Text className="text-xs font-quicksand-medium text-gray-500 mt-0.5" numberOfLines={2}>
@@ -176,10 +184,10 @@ export default function StoreDetail() {
                 </View>
 
                 {/* Address & Contact Row */}
-                <View className="pt-3 border-t border-gray-100 gap-y-1.5">
+                <View className="pt-2 gap-y-1.5">
                   {store.address ? (
                     <View className="flex-row items-center">
-                      <Text className="text-xs mr-1.5">📍</Text>
+                      <Image source={images.location} className="w-3.5 h-3.5 mr-1.5" resizeMode="contain" />
                       <Text className="text-xs font-quicksand-semibold text-gray-600 flex-1" numberOfLines={1}>
                         {store.address}
                       </Text>
@@ -196,7 +204,7 @@ export default function StoreDetail() {
 
                     <View className="bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 flex-row items-center">
                       <Text className="text-[11px] font-quicksand-bold text-emerald-700">
-                        ⚡ {deliveryProximity.timeLabel} ({deliveryProximity.distanceKm} km)
+                        ⏱️ {deliveryProximity.timeLabel} ({deliveryProximity.distanceKm} km)
                       </Text>
                     </View>
                   </View>
@@ -206,21 +214,11 @@ export default function StoreDetail() {
 
             {/* In-Store Search Bar */}
             <View className="px-5 mt-5 mb-2">
-              <View className="flex-row items-center bg-white border-2 border-primary/10 rounded-2xl px-4 py-2.5 shadow-sm">
-                <Text className="text-base mr-2">🔍</Text>
-                <TextInput
-                  placeholder={`Search items in ${store.storeName}...`}
-                  placeholderTextColor="#9CA3AF"
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  className="flex-1 font-quicksand-semibold text-dark-100 text-sm"
-                />
-                {searchQuery !== '' && (
-                  <TouchableOpacity onPress={() => setSearchQuery('')}>
-                    <Text className="text-gray-400 font-bold text-xs">✕</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+              <Searchbar
+                placeholder={`Search items in ${store.storeName || 'store'}...`}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
             </View>
 
             {/* Store Products Header */}

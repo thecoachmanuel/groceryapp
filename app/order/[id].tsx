@@ -2,16 +2,27 @@ import React, { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  ScrollView,
   Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { getOrderById, creditCustomerWallet, updateOrderStatus, getRefundPolicy } from '@/lib/appwrite'
+import {
+  getOrderById,
+  creditCustomerWallet,
+  updateOrderStatus,
+  getRefundPolicy,
+  createStoreReview,
+  getOrderReview,
+} from '@/lib/appwrite'
 import useAuthStore from '@/store/auth.store'
+import { scheduleOrderRatingNotification } from '@/lib/notifications'
 import { images } from '@/constants'
 
 // -------------------------------------------------------------------
@@ -53,11 +64,22 @@ export default function OrderTracking() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
 
+  // Customer Rating & Review State
+  const [existingReview, setExistingReview] = useState<any>(null)
+  const [ratingStars, setRatingStars] = useState(5)
+  const [ratingComment, setRatingComment] = useState('')
+  const [submittingReview, setSubmittingReview] = useState(false)
+
   const fetchOrder = async () => {
     try {
       if (id) {
         const data = await getOrderById(id)
         setOrder(data)
+
+        if (data?.$id) {
+          const rev = await getOrderReview(data.$id)
+          if (rev) setExistingReview(rev)
+        }
       }
     } catch (err) {
       console.error('Error loading order:', err)
@@ -80,6 +102,9 @@ export default function OrderTracking() {
     setActionLoading(true)
     try {
       await updateOrderStatus(order.$id, newStatus)
+      if (newStatus === 'delivered') {
+        scheduleOrderRatingNotification(order.$id, 'Store', 0)
+      }
       await fetchOrder()
       Alert.alert('Updated', `Order status set to: ${newStatus.replace(/_/g, ' ')}`)
     } catch (e: any) {
@@ -151,6 +176,34 @@ export default function OrderTracking() {
     )
   }
 
+  const handleRatingSubmit = async () => {
+    if (!order?.$id) return
+    const storeIdToUse = order.sellerId || (itemsList[0] as any)?.sellerId || (itemsList[0] as any)?.storeId || 'store_1'
+    const userIdToUse = (user as any)?.$id || (user as any)?.accountId || order.userId || 'guest_user'
+    const userNameToUse = user?.name || order.userName || 'Customer'
+
+    setSubmittingReview(true)
+    try {
+      const created = await createStoreReview({
+        orderId: order.$id,
+        storeId: storeIdToUse,
+        userId: userIdToUse,
+        userName: userNameToUse,
+        userAvatar: (user as any)?.avatar || '',
+        rating: ratingStars,
+        comment: ratingComment,
+      })
+
+      setExistingReview(created)
+      await fetchOrder()
+      Alert.alert('Review Submitted! ⭐', 'Thank you for rating your store order. Your feedback helps improve our service!')
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Could not submit rating.')
+    } finally {
+      setSubmittingReview(false)
+    }
+  }
+
   // -------------------------------------------------------------------
   // Render guards
   // -------------------------------------------------------------------
@@ -190,7 +243,18 @@ export default function OrderTracking() {
 
   return (
     <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 80 }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        className="flex-1"
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets={true}
+          contentContainerStyle={{ padding: 20, paddingBottom: 160 }}
+        >
 
         {/* ── Header ── */}
         <View className="flex-row justify-between items-center mb-6">
@@ -353,6 +417,92 @@ export default function OrderTracking() {
           ) : null}
         </View>
 
+        {/* ── Customer: Live Store Rating & Review Card ── */}
+        {normStatus === 'delivered' && !isAdmin && !isSeller && (
+          <View className="bg-white rounded-[28px] p-6 mb-5 border-2 border-primary/20 shadow-lg shadow-black/10">
+            <View className="flex-row items-center mb-3">
+              <Text className="text-xl mr-2">⭐</Text>
+              <Text className="text-dark-100 text-base font-quicksand-bold flex-1">
+                {existingReview || order.isRated ? 'Your Order Rating' : 'Rate Your Store Order'}
+              </Text>
+            </View>
+            <View className="h-px bg-primary/10 mb-4" />
+
+            {existingReview || order.isRated ? (
+              <View className="bg-primary/5 border border-primary/20 p-4 rounded-2xl">
+                <View className="flex-row items-center justify-between mb-2">
+                  <View className="flex-row">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Text key={star} className="text-lg">
+                        {star <= (existingReview?.rating || order.reviewRating || 5) ? '⭐' : '☆'}
+                      </Text>
+                    ))}
+                  </View>
+                  <View className="bg-primary px-3 py-1 rounded-full" style={{ backgroundColor: '#53B175' }}>
+                    <Text className="text-white font-quicksand-bold text-xs">Rated ✓</Text>
+                  </View>
+                </View>
+                <Text className="text-dark-100 font-quicksand-semibold text-xs">
+                  "{existingReview?.comment || order.reviewComment || 'Great service and fresh products!'}"
+                </Text>
+                <Text className="text-gray-400 font-quicksand-medium text-[10px] mt-2">
+                  Thank you! Your feedback helps other customers discover top stores.
+                </Text>
+              </View>
+            ) : (
+              <View>
+                <Text className="text-gray-500 font-quicksand-medium text-xs mb-3">
+                  How was your experience with this order? Tap a star to rate:
+                </Text>
+
+                {/* 5-Star Selector */}
+                <View className="flex-row justify-center gap-x-3 mb-4 py-2 bg-primary/5 rounded-2xl border border-primary/10">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                      key={star}
+                      activeOpacity={0.7}
+                      onPress={() => setRatingStars(star)}
+                      className="p-1.5"
+                    >
+                      <Text className="text-3xl">
+                        {star <= ratingStars ? '⭐' : '☆'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Optional Feedback Input */}
+                <TextInput
+                  value={ratingComment}
+                  onChangeText={setRatingComment}
+                  placeholder="Share details of your experience (optional)..."
+                  placeholderTextColor="#9CA3AF"
+                  multiline
+                  numberOfLines={3}
+                  className="bg-gray-50 border-2 border-primary/15 rounded-2xl p-3.5 font-quicksand-semibold text-xs text-dark-100 mb-4"
+                  style={{ textAlignVertical: 'top', minHeight: 70 }}
+                />
+
+                <TouchableOpacity
+                  disabled={submittingReview}
+                  onPress={handleRatingSubmit}
+                  activeOpacity={0.88}
+                  className="bg-primary py-3.5 rounded-full items-center justify-center shadow-md shadow-primary/30"
+                  style={{ backgroundColor: '#53B175' }}
+                >
+                  {submittingReview ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text className="text-white font-quicksand-bold text-sm">
+                      Submit Rating & Review ({ratingStars} ★)
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+
         {/* ── Admin / Seller: Order Management Controls ── */}
         {(isAdmin || isSeller) && !isCancelled && (
           <View className="bg-white rounded-[28px] p-6 mb-5 border-2 border-primary/10 shadow-lg shadow-black/10">
@@ -459,7 +609,8 @@ export default function OrderTracking() {
           </View>
         )}
 
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }

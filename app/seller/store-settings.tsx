@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import LocationPickerModal from '@/components/LocationPickerModal'
@@ -110,6 +110,9 @@ export default function SellerStoreSettings() {
     }
   }
 
+  const insets = useSafeAreaInsets()
+  const bottomInset = Math.max(insets.bottom || 0, 16)
+
   return (
     <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
       {/* Header */}
@@ -126,7 +129,7 @@ export default function SellerStoreSettings() {
             Store Profile & Settings
           </Text>
           <Text className="text-[10px] text-primary font-quicksand-bold uppercase">
-            Store Front Setup
+            Branding & Address Details
           </Text>
         </View>
 
@@ -138,7 +141,7 @@ export default function SellerStoreSettings() {
         className="flex-1"
       >
         <ScrollView
-          contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
+          contentContainerStyle={{ padding: 20, paddingBottom: bottomInset + 80 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >

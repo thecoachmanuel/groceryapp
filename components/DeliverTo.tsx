@@ -1,25 +1,45 @@
 import { images } from '@/constants'
 import * as Location from 'expo-location'
 import React, { useEffect, useState } from 'react'
-import { Image, Platform, Text, TouchableOpacity, View } from 'react-native'
+import { Image, Text, TouchableOpacity, View } from 'react-native'
 import { useLocationStore } from '@/store/location.store'
 import LocationPickerModal from '@/components/LocationPickerModal'
 
 const DeliverTo = () => {
-  const { address, setLocation } = useLocationStore()
-  const [loading, setLoading] = useState(Platform.OS !== 'web' && !address)
+  const {
+    address,
+    latitude,
+    longitude,
+    isCaptured,
+    savedAddresses,
+    setLocation,
+    selectSavedAddress,
+  } = useLocationStore()
+  const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
 
   useEffect(() => {
-    const getLocation = async () => {
-      if (Platform.OS === 'web') {
-        if (!address) {
-          setLocation('Lagos, Nigeria', { latitude: 6.5244, longitude: 3.3792 }, false)
-        }
+    // 1. Check if user already has a saved or last used address in storage
+    if (isCaptured && address && address !== 'Detecting location...' && latitude && longitude) {
+      // Saved / last used address is already loaded and ready!
+      setLoading(false)
+      return
+    }
+
+    // 2. If savedAddresses has an entry, activate the default or first saved address
+    if (savedAddresses && savedAddresses.length > 0) {
+      const defaultAddr = savedAddresses.find((a) => a.isDefault) || savedAddresses[0]
+      if (defaultAddr) {
+        selectSavedAddress(defaultAddr)
         setLoading(false)
         return
       }
+    }
+
+    // 3. Only if no saved address or last used location exists, perform initial GPS fetch
+    const getInitialLocation = async () => {
       try {
+        setLoading(true)
         const { status } = await Location.requestForegroundPermissionsAsync()
         if (status !== 'granted') {
           setLocation('Lagos, Nigeria', { latitude: 6.5244, longitude: 3.3792 }, false)
@@ -54,22 +74,27 @@ const DeliverTo = () => {
         setLoading(false)
       }
     }
-    getLocation()
+
+    getInitialLocation()
   }, [])
 
   return (
-    <View className="flex-start">
-      <Text className="small-bold text-primary">DELIVER TO</Text>
+    <View className="items-center justify-center">
       <TouchableOpacity
         onPress={() => setModalVisible(true)}
-        className="flex-center flex-row gap-x-1 mt-0.5"
+        className="flex-row items-center justify-center"
       >
-        <Text className="paragraph-bold text-dark-100 max-w-[200px]" numberOfLines={1}>
+        <Image
+          source={images.location}
+          className="w-4 h-4 mr-1.5"
+          resizeMode="contain"
+        />
+        <Text className="paragraph-bold text-dark-100 max-w-[240px] text-center" numberOfLines={1}>
           {loading ? 'Fetching...' : address}
         </Text>
         <Image
           source={images.arrowDown}
-          className="size-3"
+          className="size-3 ml-1"
           resizeMode="contain"
         />
       </TouchableOpacity>

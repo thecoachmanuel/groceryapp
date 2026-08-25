@@ -9,22 +9,23 @@ import {
   calculateHaversineDistanceKm,
   createOrder,
   debitCustomerWallet,
+  DeliveryFeeSettings,
   geocodeAddressCoords,
   getCustomerWallet,
   getDeliveryFeeSettings,
   getStoreById,
   getStores,
-  sortStoresByProximity,
   recordWalletTransaction,
+  sortStoresByProximity,
   updateUserProfile,
   validateAndApplyCoupon,
-  DeliveryFeeSettings,
 } from '@/lib/appwrite'
 import useAuthStore from '@/store/auth.store'
 import { useCartStore } from '@/store/cart.store'
 import { useLocationStore } from '@/store/location.store'
 import { PaymentInfoStripeProps } from '@/type'
 import cn from 'clsx'
+import * as Location from 'expo-location'
 import { useFocusEffect, useRouter } from 'expo-router'
 import React, { useState } from 'react'
 import { ActivityIndicator, Alert, FlatList, Keyboard, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
@@ -49,11 +50,19 @@ const PaymentInfoStripe = ({
 const Cart = () => {
   const router = useRouter()
   const { user, fetchAuthenticatedUser } = useAuthStore()
-  const { address, latitude, longitude, isCaptured, savedAddresses, selectSavedAddress } = useLocationStore()
+  const { address, latitude, longitude, isCaptured, savedAddresses, selectSavedAddress, setLocation } = useLocationStore()
   const { items, getTotalItems, getTotalPrice, clearCart, removeItem } = useCartStore()
 
   const [paymentModalVisible, setPaymentModalVisible] = useState(false)
   const [locationModalVisible, setLocationModalVisible] = useState(false)
+  const [locationMismatchModalVisible, setLocationMismatchModalVisible] = useState(false)
+  const [isDetectingLocationMismatch, setIsDetectingLocationMismatch] = useState(false)
+  const [locationMismatchInfo, setLocationMismatchInfo] = useState<{
+    currentLocationName: string
+    currentCoords: { latitude: number; longitude: number }
+    savedAddressName: string
+    distanceKm: number
+  } | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [orderNotes, setOrderNotes] = useState('')
   const [checkoutPhone, setCheckoutPhone] = useState((user as any)?.phone || '')
@@ -149,8 +158,8 @@ const Cart = () => {
             }
 
             if (st && st.latitude && st.longitude &&
-                Number(st.latitude) >= 4.0 && Number(st.latitude) <= 14.0 &&
-                Number(st.longitude) >= 2.0 && Number(st.longitude) <= 15.0) {
+              Number(st.latitude) >= 4.0 && Number(st.latitude) <= 14.0 &&
+              Number(st.longitude) >= 2.0 && Number(st.longitude) <= 15.0) {
               mapAcc[strId] = {
                 latitude: Number(st.latitude),
                 longitude: Number(st.longitude),
@@ -234,21 +243,27 @@ const Cart = () => {
   const totalPrice = getTotalPrice()
   const totalItems = getTotalItems()
 
-  // Calculate dynamic incremental delivery fee based on total products ordered, distance & subtotal
+  const uniqueSellerCount = React.useMemo(() => {
+    return new Set(items.map((i: any) => i.sellerId || i.storeId || i.seller_id).filter(Boolean)).size || 1
+  }, [items])
+
+  // Calculate dynamic incremental delivery fee based on total products ordered, distance, subtotal & store count
   const rawDeliveryCalc = deliverySettings
     ? calculateDynamicDeliveryFee(totalItems, totalPrice, deliverySettings, {
-        userLocation: userLocationCoords || undefined,
-        storeLocation: storeLocationCoords || undefined,
-      })
+      userLocation: userLocationCoords || undefined,
+      storeLocation: storeLocationCoords || undefined,
+      storeCount: uniqueSellerCount,
+    })
     : {
-        baseFee: baseDeliveryFee,
-        incrementalFee: 0,
-        totalDeliveryFee: freeDeliveryThreshold > 0 && totalPrice >= freeDeliveryThreshold ? 0 : baseDeliveryFee,
-        isFree: freeDeliveryThreshold > 0 && totalPrice >= freeDeliveryThreshold,
-        distanceKm: 2.5,
-        isOutOfRange: false,
-        breakdownText: `Base ₦${baseDeliveryFee.toLocaleString()}`,
-      }
+      baseFee: baseDeliveryFee,
+      incrementalFee: 0,
+      multiStoreSurcharge: uniqueSellerCount > 1 ? (uniqueSellerCount - 1) * 500 : 0,
+      totalDeliveryFee: freeDeliveryThreshold > 0 && totalPrice >= freeDeliveryThreshold ? 0 : baseDeliveryFee + (uniqueSellerCount > 1 ? (uniqueSellerCount - 1) * 500 : 0),
+      isFree: freeDeliveryThreshold > 0 && totalPrice >= freeDeliveryThreshold,
+      distanceKm: 2.5,
+      isOutOfRange: false,
+      breakdownText: `Base ₦${baseDeliveryFee.toLocaleString()}`,
+    }
 
   const deliveryCalc = {
     ...rawDeliveryCalc,
@@ -258,6 +273,7 @@ const Cart = () => {
 
   const actualDeliveryFee = deliveryCalc.totalDeliveryFee
   const isFreeDelivery = deliveryCalc.isFree
+  const baseDeliveryFeeToDisplay = isFreeDelivery ? 0 : (deliveryCalc.baseFee + (deliveryCalc.incrementalFee || 0))
   const amountNeededForFreeDelivery = Math.max(0, freeDeliveryThreshold - totalPrice)
 
   const netTotal = Math.max(0, totalPrice + actualDeliveryFee - couponDiscount)
@@ -293,6 +309,22 @@ const Cart = () => {
     setAppliedCoupon(null)
     setCouponDiscount(0)
     setCouponCodeInput('')
+  }
+
+  const proceedToPayment = async () => {
+    // Fetch live wallet balance
+    try {
+      if (userId) {
+        const wData: any = await getCustomerWallet(userId)
+        setWalletBalance(Number(wData.balance) || 0)
+      }
+    } catch (e) {
+      console.error('Error fetching wallet balance:', e)
+    }
+
+    const phoneToUse = (user as any)?.phone || checkoutPhone || ''
+    setCheckoutPhone(phoneToUse)
+    setPaymentModalVisible(true)
   }
 
   const handleCheckoutPress = async () => {
@@ -334,19 +366,75 @@ const Cart = () => {
       return
     }
 
-    // Fetch live wallet balance
+    // ── SMART LOCATION MISMATCH DETECTION ──
+    // If user is about to pay in a new location different from their saved delivery address, ask them!
     try {
-      if (userId) {
-        const wData: any = await getCustomerWallet(userId)
-        setWalletBalance(Number(wData.balance) || 0)
+      setIsDetectingLocationMismatch(true)
+      const { status } = await Location.getForegroundPermissionsAsync()
+      if (status === 'granted') {
+        const loc = await Promise.race([
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+        ])
+
+        const targetLat = userLocationCoords?.latitude || latitude
+        const targetLon = userLocationCoords?.longitude || longitude
+
+        if (loc && (loc as any).coords && targetLat && targetLon) {
+          const devLat = (loc as any).coords.latitude
+          const devLon = (loc as any).coords.longitude
+
+          const diffKm = calculateHaversineDistanceKm(devLat, devLon, Number(targetLat), Number(targetLon))
+
+          // If current device is more than 2.5 km away from the saved delivery address
+          if (diffKm > 2.5) {
+            let detectedName = 'Current Location'
+            try {
+              const [geo] = await Location.reverseGeocodeAsync({ latitude: devLat, longitude: devLon })
+              if (geo) {
+                const street = [geo.streetNumber, geo.street || geo.name].filter(Boolean).join(' ')
+                const area = geo.district || geo.subregion || geo.city || ''
+                detectedName = [street, area].filter(Boolean).join(', ') || 'Current GPS Location'
+              }
+            } catch { }
+
+            setLocationMismatchInfo({
+              currentLocationName: detectedName,
+              currentCoords: { latitude: devLat, longitude: devLon },
+              savedAddressName: address,
+              distanceKm: diffKm,
+            })
+            setIsDetectingLocationMismatch(false)
+            setLocationMismatchModalVisible(true)
+            return
+          }
+        }
       }
-    } catch (e) {
-      console.error('Error fetching wallet balance:', e)
+    } catch (err) {
+      console.log('[CART] Location mismatch detection skipped:', err)
+    } finally {
+      setIsDetectingLocationMismatch(false)
     }
 
-    const phoneToUse = (user as any)?.phone || checkoutPhone || ''
-    setCheckoutPhone(phoneToUse)
-    setPaymentModalVisible(true)
+    await proceedToPayment()
+  }
+
+  const handleContinueWithSavedAddress = async () => {
+    setLocationMismatchModalVisible(false)
+    await proceedToPayment()
+  }
+
+  const handleUseCurrentLocation = async () => {
+    if (locationMismatchInfo) {
+      setLocation(
+        locationMismatchInfo.currentLocationName,
+        locationMismatchInfo.currentCoords,
+        true
+      )
+      setUserLocationCoords(locationMismatchInfo.currentCoords)
+    }
+    setLocationMismatchModalVisible(false)
+    await proceedToPayment()
   }
 
   const handleCompleteOrder = async () => {
@@ -438,27 +526,96 @@ const Cart = () => {
         })
       }
 
-      const firstItem = items[0]
-      const sellerId = (firstItem as any)?.sellerId || (firstItem as any)?.storeId || (firstItem as any)?.seller_id
-
-      const order = await createOrder({
-        userId: userId || 'guest_user',
-        userName: user!.name || 'Customer',
-        userEmail: user!.email || 'customer@example.com',
-        items: JSON.stringify(items),
-        totalAmount: netTotal,
-        deliveryAddress: address || 'Current Location',
-        paymentReference: paymentRef,
-        paymentStatus: 'paid',
-        sellerId: sellerId || undefined,
-        orderNotes: orderNotes.trim(),
-        storeLatitude: storeLocationCoords?.latitude,
-        storeLongitude: storeLocationCoords?.longitude,
-        customerLatitude: userLocationCoords?.latitude,
-        customerLongitude: userLocationCoords?.longitude,
-        deliveryDistanceKm: deliveryCalc.distanceKm,
-        deliveryFee: actualDeliveryFee,
+      // Group items by unique seller/store ID for multi-vendor order splitting
+      const itemsBySeller: Record<string, typeof items> = {}
+      items.forEach((item: any) => {
+        const sId = String(item.sellerId || item.storeId || item.seller_id || 'default')
+        if (!itemsBySeller[sId]) itemsBySeller[sId] = []
+        itemsBySeller[sId].push(item)
       })
+
+      const sellerGroupIds = Object.keys(itemsBySeller)
+      const createdOrders: any[] = []
+
+      // If single vendor
+      if (sellerGroupIds.length === 1) {
+        const singleSellerId = sellerGroupIds[0] === 'default' ? undefined : sellerGroupIds[0]
+        const order = await createOrder({
+          userId: userId || 'guest_user',
+          userName: user!.name || 'Customer',
+          userEmail: user!.email || 'customer@example.com',
+          items: JSON.stringify(items),
+          totalAmount: netTotal,
+          deliveryAddress: address || 'Current Location',
+          paymentReference: paymentRef,
+          paymentStatus: 'paid',
+          sellerId: singleSellerId,
+          orderNotes: orderNotes.trim(),
+          storeLatitude: storeLocationCoords?.latitude,
+          storeLongitude: storeLocationCoords?.longitude,
+          customerLatitude: userLocationCoords?.latitude,
+          customerLongitude: userLocationCoords?.longitude,
+          deliveryDistanceKm: deliveryCalc.distanceKm,
+          deliveryFee: actualDeliveryFee,
+        })
+        createdOrders.push(order)
+      } else {
+        // Multi-Vendor Order Splitting! Create individual orders for each seller
+        const totalItemsSubtotal = items.reduce((acc: number, it: any) => {
+          const customPrice = it.customizations?.reduce((s: number, c: any) => s + c.price, 0) || 0
+          return acc + (it.price + customPrice) * it.quantity
+        }, 0)
+
+        const perStoreDeliveryFee = Math.round(actualDeliveryFee / sellerGroupIds.length)
+
+        for (let idx = 0; idx < sellerGroupIds.length; idx++) {
+          const sId = sellerGroupIds[idx]
+          const sellerItems = itemsBySeller[sId]
+
+          const sellerSubtotal = sellerItems.reduce((acc: number, it: any) => {
+            const customPrice = it.customizations?.reduce((s: number, c: any) => s + c.price, 0) || 0
+            return acc + (it.price + customPrice) * it.quantity
+          }, 0)
+
+          const discountShare = totalItemsSubtotal > 0
+            ? (sellerSubtotal / totalItemsSubtotal) * couponDiscount
+            : 0
+
+          const sellerNetTotal = Math.max(0, sellerSubtotal + perStoreDeliveryFee - discountShare)
+
+          const sellerCoords = storeLocationCoordsMap[sId] || storeLocationCoordsMap['default']
+
+          let sellerDistKm = deliveryCalc.distanceKm
+          if (sellerCoords?.latitude && sellerCoords?.longitude && userLocationCoords?.latitude && userLocationCoords?.longitude) {
+            sellerDistKm = calculateHaversineDistanceKm(
+              userLocationCoords.latitude,
+              userLocationCoords.longitude,
+              sellerCoords.latitude,
+              sellerCoords.longitude
+            )
+          }
+
+          const order = await createOrder({
+            userId: userId || 'guest_user',
+            userName: user!.name || 'Customer',
+            userEmail: user!.email || 'customer@example.com',
+            items: JSON.stringify(sellerItems),
+            totalAmount: sellerNetTotal,
+            deliveryAddress: address || 'Current Location',
+            paymentReference: `${paymentRef}_S${idx + 1}`,
+            paymentStatus: 'paid',
+            sellerId: sId === 'default' ? undefined : sId,
+            orderNotes: orderNotes.trim(),
+            storeLatitude: sellerCoords?.latitude || storeLocationCoords?.latitude,
+            storeLongitude: sellerCoords?.longitude || storeLocationCoords?.longitude,
+            customerLatitude: userLocationCoords?.latitude,
+            customerLongitude: userLocationCoords?.longitude,
+            deliveryDistanceKm: sellerDistKm,
+            deliveryFee: perStoreDeliveryFee,
+          })
+          createdOrders.push(order)
+        }
+      }
 
       clearCart()
       setOrderNotes('')
@@ -469,12 +626,21 @@ const Cart = () => {
       setPaystackVisible(false)
       setIsProcessing(false)
 
-      Alert.alert('Order Placed! 🎉', 'Your order has been confirmed & sent to the store.', [
-        {
-          text: 'Track Order',
-          onPress: () => router.push(`/order/${order.$id}` as any),
-        },
-      ])
+      const firstOrder = createdOrders[0]
+      const orderCount = createdOrders.length
+
+      Alert.alert(
+        orderCount > 1 ? 'Multi-Store Orders Placed! 🎉' : 'Order Placed! 🎉',
+        orderCount > 1
+          ? `Created ${orderCount} separate store orders for your items. Each seller will process their portion.`
+          : 'Your order has been confirmed & sent to the store.',
+        [
+          {
+            text: 'Track Order',
+            onPress: () => router.push(`/order/${firstOrder.$id}` as any),
+          },
+        ]
+      )
     } catch (err: any) {
       setIsProcessing(false)
       Alert.alert('Checkout Error', err.message || 'Could not process order.')
@@ -668,20 +834,27 @@ const Cart = () => {
                   value={
                     deliveryCalc.isOutOfRange
                       ? '⚠️ Out of Range'
-                      : (actualDeliveryFee === 0 ? 'FREE 🎉' : `₦ ${actualDeliveryFee.toFixed(2)}`)
+                      : (isFreeDelivery ? 'FREE 🎉' : `₦ ${baseDeliveryFeeToDisplay.toFixed(2)}`)
                   }
                   valueStyle={
                     deliveryCalc.isOutOfRange
                       ? '!text-red-500 font-quicksand-bold text-xs'
-                      : (actualDeliveryFee === 0 ? '!text-green-600 font-quicksand-bold' : undefined)
+                      : (isFreeDelivery ? '!text-green-600 font-quicksand-bold' : undefined)
                   }
                 />
+                {deliveryCalc.multiStoreSurcharge > 0 && (
+                  <PaymentInfoStripe
+                    label={`Multi-Store Pickup (${uniqueSellerCount} Stores)`}
+                    value={`+ ₦ ${deliveryCalc.multiStoreSurcharge.toFixed(2)}`}
+                    valueStyle="!text-amber-600 font-quicksand-bold text-xs"
+                  />
+                )}
                 <PaymentInfoStripe
                   label="Estimated Delivery Time"
                   value={
                     deliveryCalc.isOutOfRange
                       ? 'Out of Radius'
-                      : `⚡ ${calculateEstimatedDeliveryTime(deliveryCalc.distanceKm).label}`
+                      : `⏱️ ${calculateEstimatedDeliveryTime(deliveryCalc.distanceKm).label}`
                   }
                   valueStyle="!text-primary font-quicksand-bold text-xs"
                 />
@@ -715,7 +888,8 @@ const Cart = () => {
 
               <View className="mb-5">
                 <CustomButton
-                  title="Checkout"
+                  title={isDetectingLocationMismatch ? "Checking location..." : "Checkout"}
+                  isLoading={isDetectingLocationMismatch}
                   onPress={handleCheckoutPress}
                 />
               </View>
@@ -723,6 +897,116 @@ const Cart = () => {
           ) : null
         }
       />
+
+      {/* ── Location Mismatch Confirmation Modal ── */}
+      <Modal
+        visible={locationMismatchModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLocationMismatchModalVisible(false)}
+      >
+        <View className="flex-1 bg-black/60 justify-center items-center px-5">
+          <View className="bg-white rounded-[32px] p-6 w-full max-w-md shadow-2xl border-2 border-primary/20">
+            {/* Header */}
+            <View className="items-center mb-4">
+              <View className="w-14 h-14 rounded-full bg-primary/10 border-2 border-primary/20 items-center justify-center mb-3">
+                <Text className="text-2xl">📍</Text>
+              </View>
+              <Text className="text-xl font-quicksand-bold text-dark-100 text-center">
+                Different Location Detected
+              </Text>
+              <Text className="text-xs font-quicksand-medium text-gray-500 text-center mt-1 px-2 leading-relaxed">
+                You appear to be at a different location from your saved delivery address. Where would you like this order delivered?
+              </Text>
+            </View>
+
+            {/* Address Comparison Cards */}
+            <View className="gap-y-3 mb-5">
+              {/* Option A: Saved / Selected Delivery Address */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handleContinueWithSavedAddress}
+                className="bg-primary/5 border-2 border-primary/30 p-4 rounded-2xl"
+              >
+                <View className="flex-row items-start">
+                  <Text className="text-lg mr-2.5 mt-0.5">🏠</Text>
+                  <View className="flex-1">
+                    <View className="flex-row items-center justify-between mb-0.5">
+                      <Text className="text-xs font-quicksand-bold text-primary" style={{ color: '#53B175' }}>
+                        Deliver to Saved Address
+                      </Text>
+                      <View className="bg-primary px-2 py-0.5 rounded-full" style={{ backgroundColor: '#53B175' }}>
+                        <Text className="text-[10px] font-quicksand-bold text-white">Current Selection</Text>
+                      </View>
+                    </View>
+                    <Text className="text-dark-100 font-quicksand-bold text-xs" numberOfLines={2}>
+                      {locationMismatchInfo?.savedAddressName || address}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              {/* Option B: Current Physical Location */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handleUseCurrentLocation}
+                className="bg-amber-50 border-2 border-amber-300 p-4 rounded-2xl"
+              >
+                <View className="flex-row items-start">
+                  <Text className="text-lg mr-2.5 mt-0.5">🎯</Text>
+                  <View className="flex-1">
+                    <View className="flex-row items-center justify-between mb-0.5">
+                      <Text className="text-xs font-quicksand-bold text-amber-800">
+                        Deliver to Current Location
+                      </Text>
+                      <Text className="text-[10px] font-quicksand-bold text-amber-700">
+                        ~{locationMismatchInfo?.distanceKm.toFixed(1)} km away
+                      </Text>
+                    </View>
+                    <Text className="text-dark-100 font-quicksand-bold text-xs" numberOfLines={2}>
+                      {locationMismatchInfo?.currentLocationName}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Action Buttons */}
+            <View className="gap-y-2.5">
+              <TouchableOpacity
+                onPress={handleContinueWithSavedAddress}
+                className="bg-primary py-3.5 rounded-full items-center justify-center shadow-lg shadow-primary/30 active:opacity-90"
+                style={{ backgroundColor: '#53B175' }}
+              >
+                <Text className="text-white font-quicksand-bold text-sm">
+                  Continue with Saved Address →
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleUseCurrentLocation}
+                className="bg-white border-2 border-primary/30 py-3 rounded-full items-center justify-center active:opacity-80"
+              >
+                <Text className="text-primary font-quicksand-bold text-xs" style={{ color: '#53B175' }}>
+                  Update & Deliver to Current Location
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  setLocationMismatchModalVisible(false)
+                  setTimeout(() => setLocationModalVisible(true), 250)
+                }}
+                className="py-2 items-center"
+              >
+                <Text className="text-gray-400 font-quicksand-bold text-xs">
+                  Pick Another Address on Map 🗺️
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Interactive Location Picker Modal */}
       <LocationPickerModal

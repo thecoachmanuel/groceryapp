@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+.expo/
+dist/
+web-build/
+.vscode/
+screenshots/
+scripts/
+
+# Ignore local native directories so EAS generates clean native code via Prebuild
+android/
+ios/

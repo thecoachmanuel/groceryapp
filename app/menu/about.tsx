@@ -4,13 +4,13 @@ import { useRouter } from 'expo-router'
 import React from 'react'
 import {
   Image,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 import useBrandingStore from '@/store/branding.store'
 

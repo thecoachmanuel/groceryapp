@@ -29,7 +29,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 // Intelligent taxonomy mapping for auto-assigning product categories
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
@@ -410,6 +410,9 @@ export default function AdminProducts() {
     }
   }
 
+  const insets = useSafeAreaInsets()
+  const bottomInset = Math.max(insets.bottom || 0, 16)
+
   return (
     <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -548,7 +551,8 @@ export default function AdminProducts() {
         <FlatList
           data={filteredProducts}
           keyExtractor={(item) => item.$id}
-          contentContainerClassName="p-5 pb-32"
+          contentContainerClassName="p-5"
+          contentContainerStyle={{ paddingBottom: bottomInset + 32 }}
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={() => (
@@ -582,7 +586,7 @@ export default function AdminProducts() {
 
             return (
               /* Rectangle Card synced with Order Details Page Style */
-              <View className="bg-white rounded-[28px] p-5 mb-5 border-2 border-primary/10 shadow-lg shadow-black/5">
+              <View className="bg-white rounded-none p-5 mb-5 border-2 border-primary/10 shadow-lg shadow-black/5">
                 {/* Header Section: Status Indicator & Category Badge */}
                 <View className="flex-row justify-between items-center mb-3">
                   <View className="flex-row items-center">
@@ -617,7 +621,7 @@ export default function AdminProducts() {
                 {/* Main Product Info Rectangle */}
                 <View className="flex-row items-center mb-4">
                   {/* High-Resolution Guaranteed Product Image */}
-                  <View className="w-24 h-24 rounded-2xl overflow-hidden bg-primary/5 mr-4 border-2 border-primary/15 items-center justify-center">
+                  <View className="w-24 h-24 rounded-none overflow-hidden bg-primary/5 mr-4 border-2 border-primary/15 items-center justify-center">
                     <FastImage
                       source={resolvedImg}
                       className="w-full h-full"
@@ -738,7 +742,7 @@ export default function AdminProducts() {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      onPress={() => handleDeleteProduct(item.$id, item.name, item.image_url)}
+                      onPress={() => handleDeleteProduct(item.$id, item.name, item.image_url || item.imageUrl || item.image)}
                       className="bg-red-500/10 border-2 border-red-500/30 px-3.5 py-2 rounded-2xl active:opacity-80"
                     >
                       <Text className="text-red-600 font-quicksand-bold text-xs">Delete 🗑️</Text>
@@ -840,7 +844,11 @@ export default function AdminProducts() {
                   <TouchableOpacity
                     onPress={() => {
                       setInspectModalVisible(false)
-                      handleDeleteProduct(inspectingProduct.$id, inspectingProduct.name, inspectingProduct.image_url)
+                      handleDeleteProduct(
+                        inspectingProduct.$id,
+                        inspectingProduct.name,
+                        inspectingProduct.image_url || inspectingProduct.imageUrl || inspectingProduct.image
+                      )
                     }}
                     className="flex-1 bg-red-500/10 border-2 border-red-500/20 py-3 rounded-2xl items-center"
                   >

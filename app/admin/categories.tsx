@@ -14,7 +14,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import {
@@ -203,23 +203,27 @@ export default function AdminCategories() {
     }
   }
 
-  const handleDelete = async (id: string, name: string) => {
-    Alert.alert('Delete Category', `Are you sure you want to delete "${name}"? Products under this category may become uncategorized.`, [
+  const handleDelete = async (id: string, name: string, iconUrl?: string) => {
+    Alert.alert('Delete Category', `Are you sure you want to delete "${name}"? Products under this category may become uncategorized and the category will be permanently removed from the database.`, [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Delete',
+        text: 'Delete Permanently',
         style: 'destructive',
         onPress: async () => {
           try {
-            await deleteCategory(id)
+            await deleteCategory(id, iconUrl)
+            Alert.alert('Deleted ✅', `Category "${name}" deleted permanently.`)
             fetchCategoriesList()
           } catch (err: any) {
-            Alert.alert('Error', err.message)
+            Alert.alert('Error', err.message || 'Could not delete category.')
           }
         },
       },
     ])
   }
+
+  const insets = useSafeAreaInsets()
+  const bottomInset = Math.max(insets.bottom || 0, 16)
 
   return (
     <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
@@ -313,7 +317,8 @@ export default function AdminCategories() {
         <FlatList
           data={filteredCategories}
           keyExtractor={(item) => item.$id}
-          contentContainerClassName="p-5 pb-32"
+          contentContainerClassName="p-5"
+          contentContainerStyle={{ paddingBottom: bottomInset + 32 }}
           ListEmptyComponent={() => (
             <View className="items-center mt-16 px-8">
               <View className="w-20 h-20 bg-primary/10 rounded-3xl items-center justify-center mb-4 border border-primary/20">
@@ -390,7 +395,7 @@ export default function AdminCategories() {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      onPress={() => handleDelete(item.$id, item.name)}
+                      onPress={() => handleDelete(item.$id, item.name, item.iconUrl || item.image_url)}
                       className="bg-red-500/10 border border-red-500/30 px-3 py-2 rounded-xl active:opacity-80"
                     >
                       <Text className="text-red-600 font-quicksand-bold text-xs">Delete 🗑️</Text>

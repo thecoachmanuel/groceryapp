@@ -31,8 +31,8 @@ const ONBOARDING_DATA = [
   },
   {
     id: '3',
-    title: 'Groceries Delivered',
-    text: 'Relax while we deliver fresh groceries to you.',
+    title: 'Doorstep Delivery',
+    text: 'Relax while we deliver your order straight to your doorstep.',
     image: images.onboardingDelivery,
   },
 ]
@@ -82,9 +82,8 @@ export default function OnboardingScreen() {
         {ONBOARDING_DATA.map((_, i) => (
           <View
             key={i}
-            className={`h-1.5 rounded-full ${
-              i === index ? 'w-6 bg-primary' : 'w-1.5 bg-gray-200'
-            }`}
+            className={`h-1.5 rounded-full ${i === index ? 'w-6 bg-primary' : 'w-1.5 bg-gray-200'
+              }`}
           />
         ))}
       </View>
@@ -147,6 +146,6 @@ export default function OnboardingScreen() {
           )}
         </View>
       </SafeAreaView>
-    </SafeAreaProvider>
+  </SafeAreaProvider>
   )
 }

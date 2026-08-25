@@ -2,12 +2,12 @@ import React, { useState } from 'react'
 import {
   FlatList,
   Image,
-  SafeAreaView,
   StatusBar,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { images } from '@/constants'
 import { usePagesStore } from '@/store/pages.store'

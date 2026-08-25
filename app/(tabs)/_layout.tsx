@@ -61,6 +61,8 @@ export default function TabLayout() {
   const { isAuthenticated, user, role, sellerStore } = useAuthStore()
   const { getUnreadCount } = useNotificationStore()
 
+  if (!isAuthenticated) return <Redirect href="/sign-in" />
+
   const currentUserId = user?.$id || (user as any)?.accountId
   const sellerStoreId = sellerStore?.$id || (user as any)?.storeId
   const unreadNotifCount = getUnreadCount(role, currentUserId, sellerStoreId)
@@ -77,11 +79,7 @@ export default function TabLayout() {
         sceneStyle: { backgroundColor: '#ffffff' },
         tabBarStyle: {
           borderRadius: 35,
-          marginHorizontal: Platform.OS === 'web' ? 'auto' : 15,
-          maxWidth: Platform.OS === 'web' ? 450 : undefined,
-          width: Platform.OS === 'web' ? '92%' : undefined,
-          left: 0,
-          right: 0,
+          marginHorizontal: 15,
           height: 70,
           position: 'absolute',
           bottom: tabBottomOffset,
@@ -131,7 +129,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 4. Alerts / Notifications (Outline Icon Type, Positioned After Orders) */}
+      {/* 4. Alerts / Notifications */}
       <Tabs.Screen
         name="notifications"
         options={{

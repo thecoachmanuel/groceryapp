@@ -22,6 +22,17 @@ export interface Banner extends Models.Document {
     targetId?: string;
 }
 
+export interface StoreReview extends Models.Document {
+    orderId: string;
+    storeId: string;
+    userId: string;
+    userName: string;
+    userAvatar?: string;
+    rating: number;
+    comment?: string;
+    createdAt?: string;
+}
+
 export interface Store extends Models.Document {
     userId: string;
     storeName: string;
@@ -36,6 +47,11 @@ export interface Store extends Models.Document {
     allowedCategories?: string;
     latitude?: number;
     longitude?: number;
+    rating?: number;
+    totalReviews?: number;
+    bankName?: string;
+    accountNumber?: string;
+    accountName?: string;
 }
 
 export interface WalletTransaction extends Models.Document {
@@ -53,9 +69,16 @@ export interface SellerPayout extends Models.Document {
     storeName?: string;
     amount: number;
     commissionDeducted?: number;
-    status: 'pending' | 'completed' | 'failed';
+    status: 'pending' | 'completed' | 'failed' | 'approved' | 'rejected';
     paymentMethod?: string;
     reference?: string;
+    bankName?: string;
+    accountNumber?: string;
+    accountName?: string;
+    rejectionReason?: string;
+    notes?: string;
+    requestedAt?: string;
+    processedAt?: string;
     createdAt?: string;
 }
 

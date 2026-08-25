@@ -1,20 +1,28 @@
+﻿import CartButton from '@/components/CartButton'
+import { images } from '@/constants'
 import useAuthStore from '@/store/auth.store'
 import useNotificationStore, { AppNotification } from '@/store/notification.store'
+import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect, useRouter } from 'expo-router'
 import React, { useCallback, useMemo, useState } from 'react'
 import {
   FlatList,
+  Image,
+  Keyboard,
+  Platform,
   RefreshControl,
   ScrollView,
   StatusBar,
   Text,
   TouchableOpacity,
-  View
+  TouchableWithoutFeedback,
+  View,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 export default function NotificationsScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const { user, role, sellerStore, isAdmin } = useAuthStore()
   const { getFilteredNotifications, markAsRead, markAllAsRead } = useNotificationStore()
 
@@ -24,7 +32,7 @@ export default function NotificationsScreen() {
   const currentUserId = user?.$id || (user as any)?.accountId
   const sellerStoreId = sellerStore?.$id || (user as any)?.storeId
 
-  // Auto-mark notifications as read immediately when the user views the Notifications screen
+  // Auto-mark notifications as read immediately when user views the screen
   useFocusEffect(
     useCallback(() => {
       markAllAsRead(role, currentUserId, sellerStoreId)
@@ -121,196 +129,234 @@ export default function NotificationsScreen() {
   const getNotifMeta = (type: string) => {
     switch (type) {
       case 'seller_order':
-        return { icon: '🏪', tag: 'Store Order', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-700' }
+        return {
+          ionicon: 'storefront-outline' as const,
+          tag: 'Store Order',
+          bg: 'bg-emerald-50',
+          border: 'border-emerald-200',
+          color: '#059669',
+        }
       case 'admin_order':
-        return { icon: '👑', tag: 'Platform Order', bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-700' }
+        return {
+          ionicon: 'shield-checkmark-outline' as const,
+          tag: 'Platform Order',
+          bg: 'bg-amber-50',
+          border: 'border-amber-200',
+          color: '#D97706',
+        }
       case 'order':
-        return { icon: '📦', tag: 'Delivery', bg: 'bg-primary/10', border: 'border-primary/20', text: 'text-primary' }
+        return {
+          ionicon: 'cube-outline' as const,
+          tag: 'Delivery',
+          bg: 'bg-primary/10',
+          border: 'border-primary/20',
+          color: '#53B175',
+        }
       case 'wallet':
-        return { icon: '💳', tag: 'Wallet', bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-700' }
+        return {
+          ionicon: 'card-outline' as const,
+          tag: 'Wallet',
+          bg: 'bg-blue-50',
+          border: 'border-blue-200',
+          color: '#2563EB',
+        }
       case 'promo':
-        return { icon: '🎟️', tag: 'Special Promo', bg: 'bg-pink-500/10', border: 'border-pink-500/20', text: 'text-pink-700' }
+        return {
+          ionicon: 'pricetag-outline' as const,
+          tag: 'Special Promo',
+          bg: 'bg-pink-50',
+          border: 'border-pink-200',
+          color: '#DB2777',
+        }
       default:
-        return { icon: '📢', tag: 'Announcement', bg: 'bg-violet-500/10', border: 'border-violet-500/20', text: 'text-violet-700' }
+        return {
+          ionicon: 'notifications-outline' as const,
+          tag: 'Announcement',
+          bg: 'bg-purple-50',
+          border: 'border-purple-200',
+          color: '#7C3AED',
+        }
     }
   }
 
+  const tabBottomOffset = Platform.OS === 'ios'
+    ? Math.max(insets.bottom || 0, 12)
+    : (insets.bottom > 0 ? insets.bottom : 0)
+  const tabHeight = 70
+
   return (
-    <View className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
-      <StatusBar barStyle="light-content" backgroundColor="#53B175" />
+    <View className="flex-1 bg-white relative" style={{ backgroundColor: '#ffffff' }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
-      {/* Header Banner spanning into status bar */}
-      <SafeAreaView edges={['top']} className="bg-primary rounded-b-[40px] shadow-lg shadow-primary/30" style={{ backgroundColor: '#53B175' }}>
-        <View className="px-6 pt-3 pb-8">
-          <View className="flex-row justify-between items-center mb-3">
-            <View className="flex-row items-center bg-white/20 px-3 py-1 rounded-full">
-              <Text className="text-white text-[11px] uppercase tracking-wider font-quicksand-bold">
-                {role === 'admin' ? '👑 Admin Alert Center' : role === 'seller' ? '🏪 Seller Inbox' : '🥬 Customer Inbox'}
-              </Text>
-            </View>
-
-            {isAdmin && (
-              <TouchableOpacity
-                onPress={() => router.push('/admin/broadcast' as any)}
-                className="bg-white/20 border border-white/30 px-3 py-1 rounded-full active:opacity-80 flex-row items-center"
-              >
-                <Text className="text-white font-quicksand-bold text-xs">+ Broadcast 📣</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <View className="flex-row justify-between items-end">
-            <View>
-              <Text className="text-white text-2xl font-quicksand-bold">
-                Notifications
-              </Text>
-              <Text className="text-white/80 text-xs font-quicksand-medium mt-0.5">
-                Automatically updated & marked as read
-              </Text>
-            </View>
-
-            <View className="bg-white/20 px-3 py-1.5 rounded-2xl border border-white/30 items-center justify-center">
-              <Text className="text-white font-quicksand-bold text-sm">
-                🔔 {allBaseUserNotifications.length}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </SafeAreaView>
-
-      {/* Filter Chips with Real-Time Counters */}
-      <View className="mt-4">
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20 }}
-        >
-          {(
-            [
-              { key: 'all', label: `All (${counts.all})` },
-              { key: 'orders', label: `Orders 📦 (${counts.orders})` },
-              { key: 'wallet', label: `Wallet 💳 (${counts.wallet})` },
-              { key: 'alerts', label: `Alerts 🔔 (${counts.alerts})` },
-            ] as const
-          ).map((chip) => {
-            const isSelected = activeFilter === chip.key
-
-            return (
-              <TouchableOpacity
-                key={chip.key}
-                onPress={() => setActiveFilter(chip.key)}
-                className={`px-3.5 py-2 mr-2 rounded-2xl border-2 ${isSelected
-                  ? 'bg-primary border-primary'
-                  : 'bg-white border-primary/10'
-                  }`}
-                style={
-                  isSelected
-                    ? { backgroundColor: '#53B175', borderColor: '#53B175' }
-                    : { backgroundColor: '#ffffff', borderColor: 'rgba(83, 177, 117, 0.2)' }
-                }
-              >
-                <Text
-                  className={`font-quicksand-bold text-xs ${isSelected ? 'text-white' : 'text-dark-100'
-                    }`}
-                >
-                  {chip.label}
-                </Text>
-              </TouchableOpacity>
-            )
-          })}
-        </ScrollView>
-      </View>
-
-      {/* Notification Feed */}
-      <FlatList
-        data={userNotifications}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 20, paddingBottom: 130 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#53B175']} />
-        }
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={() => (
-          <View className="items-center mt-12 px-8">
-            <View className="bg-white border-2 border-primary/15 rounded-[36px] px-8 py-10 items-center shadow-lg shadow-black/5 w-full">
-              <View className="w-16 h-16 bg-primary/10 rounded-2xl items-center justify-center mb-3 border border-primary/20" style={{ backgroundColor: 'rgba(83, 177, 117, 0.1)', borderColor: 'rgba(83, 177, 117, 0.2)' }}>
-                <Text className="text-3xl">📭</Text>
-              </View>
-              <Text className="text-dark-100 text-lg font-quicksand-bold">
-                No Notifications Found
-              </Text>
-              <Text className="text-gray-400 text-xs font-quicksand-medium mt-1.5 text-center leading-relaxed">
-                {activeFilter === 'all'
-                  ? "You're all caught up! New orders, status changes, and balance alerts will appear here in real time."
-                  : `No notifications under the "${activeFilter.toUpperCase()}" filter category.`}
-              </Text>
-            </View>
-          </View>
-        )}
-        renderItem={({ item }) => {
-          const meta = getNotifMeta(item.type)
-          return (
-            <TouchableOpacity
-              activeOpacity={0.88}
-              onPress={() => handleNotificationPress(item)}
-              className={`rounded-[26px] p-4 mb-3 border-2 shadow-sm ${item.read
-                ? 'bg-white border-primary/10'
-                : 'border-primary/30 shadow-primary/10'
-                }`}
-              style={
-                item.read
-                  ? { backgroundColor: '#ffffff', borderColor: 'rgba(83, 177, 117, 0.15)' }
-                  : { backgroundColor: 'rgba(83, 177, 117, 0.06)', borderColor: 'rgba(83, 177, 117, 0.35)' }
-              }
-            >
-              <View className="flex-row items-start">
-                <View className={`w-11 h-11 rounded-2xl ${meta.bg} border ${meta.border} items-center justify-center mr-3 mt-0.5`}>
-                  <Text className="text-xl">{meta.icon}</Text>
+      {/* ── Viewport Bounded Content Container ── */}
+      <View style={{ flex: 1, marginBottom: tabBottomOffset }} className="overflow-hidden">
+        {/* Header matching Find Products Page design */}
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View className="pt-2 pb-2 bg-white border-b border-[#F1F1F1]" style={{ backgroundColor: '#ffffff', borderColor: '#F1F1F1' }}>
+            <SafeAreaView edges={['top']} className="bg-white px-5 pt-2 pb-2" style={{ backgroundColor: '#ffffff' }}>
+              {/* Top Title Row with Cart */}
+              <View className="flex-row items-center justify-between mb-3">
+                <View className="flex-1 mr-2">
+                  <Text className="text-2xl font-quicksand-bold font-bold text-dark-100">
+                    Notifications
+                  </Text>
+                  <Text className="text-xs font-quicksand-medium text-gray-400 mt-0.5">
+                    Order updates, delivery & account alerts
+                  </Text>
                 </View>
 
-                <View className="flex-1 pr-2">
-                  <View className="flex-row items-center justify-between mb-1">
-                    <View className="flex-row items-center flex-1 mr-2">
-                      <Text className="font-quicksand-bold text-dark-100 text-sm mr-2" numberOfLines={1}>
-                        {item.title}
-                      </Text>
-                    </View>
-                    <Text className="text-[10px] text-gray-400 font-quicksand-medium">
+                <View className="bg-gray-50 border border-[#F1F1F1] rounded-2xl p-1.5" style={{ borderColor: '#F1F1F1' }}>
+                  <CartButton />
+                </View>
+              </View>
+
+              {/* Horizontal Filter Chips */}
+              <View className="mt-1">
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingRight: 10 }}
+                  className="flex-row"
+                >
+                  {(
+                    [
+                      { key: 'all', label: `All (${counts.all})` },
+                      { key: 'orders', label: `Orders (${counts.orders})` },
+                      { key: 'wallet', label: `Wallet (${counts.wallet})` },
+                      { key: 'alerts', label: `Alerts (${counts.alerts})` },
+                    ] as const
+                  ).map((chip) => {
+                    const isSelected = activeFilter === chip.key
+                    return (
+                      <TouchableOpacity
+                        key={chip.key}
+                        onPress={() => setActiveFilter(chip.key)}
+                        className={`px-3.5 py-1.5 mr-2 rounded-2xl border flex-row items-center active:scale-95 ${
+                          isSelected ? 'bg-primary border-primary' : 'bg-gray-50 border-[#F1F1F1]'
+                        }`}
+                        style={
+                          isSelected
+                            ? { backgroundColor: '#53B175', borderColor: '#53B175' }
+                            : { backgroundColor: '#F9FAFB', borderColor: '#F1F1F1' }
+                        }
+                      >
+                        <Text
+                          className={`font-quicksand-semibold text-xs ${
+                            isSelected ? 'text-white' : 'text-dark-100'
+                          }`}
+                        >
+                          {chip.label}
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </ScrollView>
+              </View>
+
+              {/* Quick Summary Bar */}
+              <View className="flex-row items-center justify-between mt-2.5 px-0.5">
+                <View className="flex-row items-center">
+                  <View className="w-2 h-2 bg-primary rounded-full mr-2" style={{ backgroundColor: '#53B175' }} />
+                  <Text className="text-dark-100 text-xs font-quicksand-semibold">
+                    {activeFilter === 'all' ? 'All Alerts' : `${activeFilter.toUpperCase()} Notifications`}
+                  </Text>
+                </View>
+                <Text className="text-[11px] text-gray-400 font-quicksand-medium">
+                  {userNotifications.length} Notifications
+                </Text>
+              </View>
+            </SafeAreaView>
+          </View>
+        </TouchableWithoutFeedback>
+
+        {/* ── Scrollable Notifications List ── */}
+        <FlatList
+          data={userNotifications}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: tabHeight + 40 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#53B175']}
+              tintColor="#53B175"
+            />
+          }
+          ListEmptyComponent={() => (
+            <View className="items-center mt-10 px-4">
+              <View className="bg-white border border-[#F1F1F1] rounded-3xl p-8 items-center w-full" style={{ borderColor: '#F1F1F1' }}>
+                <View className="w-14 h-14 bg-primary/10 rounded-2xl items-center justify-center mb-3">
+                  <Ionicons name="notifications-off-outline" size={28} color="#53B175" />
+                </View>
+                <Text className="text-dark-100 text-base font-quicksand-bold text-center">
+                  No Notifications Found
+                </Text>
+                <Text className="text-gray-400 text-xs font-quicksand-medium mt-1.5 text-center leading-relaxed">
+                  {activeFilter === 'all'
+                    ? "You're all caught up! New orders, delivery updates, and wallet alerts will appear here in real time."
+                    : `No notifications under the "${activeFilter.toUpperCase()}" filter.`}
+                </Text>
+              </View>
+            </View>
+          )}
+          renderItem={({ item }) => {
+            const meta = getNotifMeta(item.type)
+            return (
+              <TouchableOpacity
+                activeOpacity={0.88}
+                onPress={() => handleNotificationPress(item)}
+                className="bg-white border border-[#F1F1F1] rounded-2xl p-3.5 mb-3 flex-row items-center active:scale-98"
+                style={{ backgroundColor: '#ffffff', borderColor: '#F1F1F1' }}
+              >
+                {/* Left Icon Square */}
+                <View className={`w-10 h-10 rounded-xl ${meta.bg} border ${meta.border} items-center justify-center mr-3`}>
+                  <Ionicons name={meta.ionicon} size={18} color={meta.color} />
+                </View>
+
+                {/* Content Body */}
+                <View className="flex-1 pr-1">
+                  <View className="flex-row items-center justify-between mb-0.5">
+                    <Text className="font-quicksand-bold font-bold text-dark-100 text-sm flex-1 mr-2 leading-tight" numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                    <Text className="text-xs text-gray-400 font-quicksand-medium">
                       {formatTime(item.timestamp)}
                     </Text>
                   </View>
 
-                  <Text className="text-xs font-quicksand-medium text-gray-600 leading-relaxed">
+                  <Text className="text-xs font-quicksand-medium text-gray-500 leading-snug" numberOfLines={2}>
                     {item.body}
                   </Text>
 
-                  <View className="mt-2.5 flex-row items-center justify-between">
-                    <View className={`px-2.5 py-0.5 rounded-full border ${meta.border} ${meta.bg}`}>
-                      <Text className={`text-[10px] font-quicksand-bold ${meta.text}`}>
+                  {/* Bottom Sub-tag */}
+                  <View className="mt-2 flex-row items-center justify-between">
+                    <View className={`px-2 py-0.5 rounded-full border ${meta.border} ${meta.bg}`}>
+                      <Text className="text-[10px] font-quicksand-bold" style={{ color: meta.color }}>
                         {meta.tag}
                       </Text>
                     </View>
 
                     {item.orderId ? (
-                      <Text className="text-[11px] font-quicksand-bold text-primary" style={{ color: '#53B175' }}>
-                        View Details →
+                      <Text className="text-xs font-quicksand-bold text-primary" style={{ color: '#53B175' }}>
+                        View Order →
                       </Text>
                     ) : item.type === 'promo' ? (
-                      <Text className="text-[11px] font-quicksand-bold text-pink-600">
+                      <Text className="text-xs font-quicksand-bold text-pink-600">
                         Shop Promo →
                       </Text>
-                    ) : null}
+                    ) : (
+                      <Text className="text-xs font-quicksand-bold text-gray-400">
+                        Details →
+                      </Text>
+                    )}
                   </View>
                 </View>
-
-                {!item.read && (
-                  <View className="w-2.5 h-2.5 bg-primary rounded-full mt-1.5" style={{ backgroundColor: '#53B175' }} />
-                )}
-              </View>
-            </TouchableOpacity>
-          )
-        }}
-      />
+              </TouchableOpacity>
+            )
+          }}
+        />
+      </View>
     </View>
   )
 }

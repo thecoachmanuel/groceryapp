@@ -9,9 +9,10 @@ import {
   Alert,
   RefreshControl,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { getSellerOrders, updateOrderStatus, getAllOrders } from '@/lib/appwrite'
+import { scheduleOrderRatingNotification } from '@/lib/notifications'
 import useAuthStore from '@/store/auth.store'
 import { images } from '@/constants'
 
@@ -29,12 +30,9 @@ export default function SellerOrders() {
 
   const fetchOrders = async () => {
     try {
-      let data = await getSellerOrders(sellerId)
-      // Fallback: If sellerId hasn't been set on older orders, load all orders
-      if (!data || data.length === 0) {
-        data = await getAllOrders().catch(() => [])
-      }
-      setOrders(data)
+      if (!sellerId) return
+      const data = await getSellerOrders(sellerId)
+      setOrders(data || [])
     } catch (err) {
       console.error('Error fetching seller orders:', err)
     } finally {
@@ -45,8 +43,6 @@ export default function SellerOrders() {
 
   useEffect(() => {
     fetchOrders()
-    const interval = setInterval(fetchOrders, 6000)
-    return () => clearInterval(interval)
   }, [sellerId])
 
   const onRefresh = () => {
@@ -57,6 +53,9 @@ export default function SellerOrders() {
   const handleUpdateStatus = async (orderId: string, newStatus: string) => {
     try {
       await updateOrderStatus(orderId, newStatus)
+      if (newStatus === 'delivered') {
+        scheduleOrderRatingNotification(orderId, sellerStore?.storeName || 'Store', 0)
+      }
       Alert.alert('Fulfillment Progressed', `Order status updated to "${newStatus.replace(/_/g, ' ')}"`)
       fetchOrders()
     } catch (err: any) {
@@ -67,6 +66,9 @@ export default function SellerOrders() {
   const filteredOrders = orders.filter((o) =>
     activeFilter === 'all' ? true : o.status === activeFilter,
   )
+
+  const insets = useSafeAreaInsets()
+  const bottomInset = Math.max(insets.bottom || 0, 16)
 
   return (
     <SafeAreaView className="flex-1 bg-white" style={{ backgroundColor: '#ffffff' }}>
@@ -127,7 +129,8 @@ export default function SellerOrders() {
         <FlatList
           data={filteredOrders}
           keyExtractor={(item) => item.$id}
-          contentContainerClassName="p-5 pb-32"
+          contentContainerClassName="p-5"
+          contentContainerStyle={{ paddingBottom: bottomInset + 32 }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#53B175']} />
           }

@@ -3,6 +3,7 @@ import {
   creditCustomerWallet,
   debitCustomerWallet,
   getAllCustomers,
+  getAllCustomerWalletsMap,
   getCustomerWallet,
   getWalletTransactions,
   updateUserAccountStatus,
@@ -45,24 +46,41 @@ export default function AdminCustomersScreen() {
   const fetchCustomerList = async () => {
     try {
       setLoading(true)
-      const list = await getAllCustomers()
+      const [list, walletsMap] = await Promise.all([
+        getAllCustomers(),
+        getAllCustomerWalletsMap(),
+      ])
       setCustomers(list)
 
-      // Concurrently fetch available wallet balance for all customers
       const balanceMap: Record<string, number> = {}
+      for (const cust of list) {
+        const uId = cust.accountId || cust.$id
+        const altId = cust.$id !== uId ? cust.$id : cust.accountId
+        const email = cust.email
+
+        const matchedBal =
+          walletsMap[cust.$id] ??
+          walletsMap[cust.accountId] ??
+          walletsMap[email] ??
+          Number(cust.walletBalance ?? cust.balance ?? 0)
+
+        balanceMap[cust.$id] = matchedBal
+      }
+      setWalletBalances(balanceMap)
+
+      // Also concurrently load specific wallets to ensure fresh balances
       await Promise.all(
         list.map(async (cust: any) => {
           try {
             const uId = cust.accountId || cust.$id
             const altId = cust.$id !== uId ? cust.$id : cust.accountId
             const w: any = await getCustomerWallet(uId, altId, cust.email)
-            balanceMap[cust.$id] = Number(w?.balance || 0)
-          } catch {
-            balanceMap[cust.$id] = 0
-          }
+            if (w && w.balance !== undefined) {
+              setWalletBalances((prev) => ({ ...prev, [cust.$id]: Number(w.balance || 0) }))
+            }
+          } catch {}
         })
       )
-      setWalletBalances(balanceMap)
     } catch (err) {
       console.error('Error fetching customers:', err)
     } finally {
@@ -198,6 +216,27 @@ export default function AdminCustomersScreen() {
           <View className="w-10" />
         </View>
       </TouchableWithoutFeedback>
+
+      {/* Total Customer Wallet Liability Banner */}
+      <View className="mx-5 mt-3 bg-purple-50 border-2 border-purple-200/80 rounded-2xl p-4 flex-row items-center justify-between shadow-sm">
+        <View className="flex-row items-center flex-1 mr-2">
+          <View className="w-10 h-10 rounded-xl bg-purple-100 items-center justify-center mr-3">
+            <Text className="text-xl">👛</Text>
+          </View>
+          <View>
+            <Text className="text-xs font-quicksand-bold text-purple-950 uppercase tracking-wide">
+              Total Customer Wallet Liabilities
+            </Text>
+            <Text className="text-xs font-quicksand-medium text-purple-700">
+              {customers.length} registered customer accounts
+            </Text>
+          </View>
+        </View>
+
+        <Text className="text-purple-800 font-quicksand-bold text-lg">
+          ₦ {Object.values(walletBalances).reduce((a, b) => a + b, 0).toLocaleString()}
+        </Text>
+      </View>
 
       {/* Search Input */}
       <View className="px-5 py-3">

@@ -14,11 +14,11 @@ const CartItem = ({ item }: { item: CartItemType }) => {
         Platform.OS === 'android'
           ? { elevation: 4 }
           : {
-              shadowColor: '#000',
-              shadowOpacity: 0.06,
-              shadowRadius: 12,
-              shadowOffset: { width: 0, height: 6 },
-            }
+            shadowColor: '#000',
+            shadowOpacity: 0.06,
+            shadowRadius: 12,
+            shadowOffset: { width: 0, height: 6 },
+          }
       }
     >
       <View className="flex-row items-center flex-1">

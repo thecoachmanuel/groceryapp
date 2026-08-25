@@ -1,37 +1,31 @@
-import { SplashScreen, Stack, useRouter } from "expo-router";
 import { useFonts } from 'expo-font';
-import { useEffect} from "react";
+import { SplashScreen, Stack, useRouter } from "expo-router";
+import { useEffect } from "react";
 
-import './global.css';
-import { Platform } from 'react-native';
-import * as Sentry from '@sentry/react-native';
 import useAuthStore from "@/store/auth.store";
+import * as Sentry from '@sentry/react-native';
+import './global.css';
 
-if (Platform.OS !== 'web') {
-  try {
-    Sentry.init({
-      dsn: 'https://94edd17ee98a307f2d85d750574c454a@o4506876178464768.ingest.us.sentry.io/4509588544094208',
-      sendDefaultPii: true,
-      replaysSessionSampleRate: 1,
-      replaysOnErrorSampleRate: 1,
-      integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
-    });
-  } catch (err) {
-    console.warn('[SENTRY] Initialization skipped on this platform:', err);
-  }
-}
+Sentry.init({
+  dsn: 'https://94edd17ee98a307f2d85d750574c454a@o4506876178464768.ingest.us.sentry.io/4509588544094208',
+  sendDefaultPii: true,
+  replaysSessionSampleRate: 1,
+  replaysOnErrorSampleRate: 1,
+  integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
+});
 
-import { useState } from 'react';
-import { Animated, ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-native';
-import { subscribeToOrders } from "@/lib/appwrite";
 import { images } from "@/constants";
+import { subscribeToOrders } from "@/lib/appwrite";
 import useBrandingStore from "@/store/branding.store";
+import { useState } from 'react';
+import { ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-native';
 
-import useNotificationStore from "@/store/notification.store";
+import * as Notifications from 'expo-notifications';
 import { registerForPushNotificationsAsync, sendLocalNotification } from "@/lib/notifications";
+import useNotificationStore from "@/store/notification.store";
 import * as Updates from 'expo-updates';
 
-function RootLayout() {
+export default Sentry.wrap(function RootLayout() {
   const router = useRouter();
   const { isLoading, fetchAuthenticatedUser, user, role, isSeller, isAdmin, sellerStore } = useAuthStore();
   const { appName, appLogo, fetchBranding } = useBrandingStore();
@@ -39,21 +33,38 @@ function RootLayout() {
   const [notification, setNotification] = useState<{ title: string; body: string; icon?: string; orderId?: string } | null>(null);
 
   const [fontsLoaded, error] = useFonts({
-    "Quicksand-Bold": require('../assets/fonts/Quicksand-Bold.ttf'),
-    "Quicksand-Medium": require('../assets/fonts/Quicksand-Medium.ttf'),
-    "Quicksand-Regular": require('../assets/fonts/Quicksand-Regular.ttf'),
-    "Quicksand-SemiBold": require('../assets/fonts/Quicksand-SemiBold.ttf'),
-    "Quicksand-Light": require('../assets/fonts/Quicksand-Light.ttf'),
-    "QuickSand-Bold": require('../assets/fonts/Quicksand-Bold.ttf'),
-    "QuickSand-Medium": require('../assets/fonts/Quicksand-Medium.ttf'),
-    "QuickSand-Regular": require('../assets/fonts/Quicksand-Regular.ttf'),
-    "QuickSand-SemiBold": require('../assets/fonts/Quicksand-SemiBold.ttf'),
-    "QuickSand-Light": require('../assets/fonts/Quicksand-Light.ttf'),
+    // Primary Quicksand Font System
+    'Quicksand-Bold': require('../assets/fonts/Quicksand-Bold.ttf'),
+    'Quicksand-SemiBold': require('../assets/fonts/Quicksand-SemiBold.ttf'),
+    'Quicksand-Medium': require('../assets/fonts/Quicksand-Medium.ttf'),
+    'Quicksand-Regular': require('../assets/fonts/Quicksand-Regular.ttf'),
+    'Quicksand-Light': require('../assets/fonts/Quicksand-Light.ttf'),
+
+    // Case Variations & Legacy Aliases
+    'QuickSand-Bold': require('../assets/fonts/Quicksand-Bold.ttf'),
+    'QuickSand-SemiBold': require('../assets/fonts/Quicksand-SemiBold.ttf'),
+    'QuickSand-Medium': require('../assets/fonts/Quicksand-Medium.ttf'),
+    'QuickSand-Regular': require('../assets/fonts/Quicksand-Regular.ttf'),
+    'QuickSand-Light': require('../assets/fonts/Quicksand-Light.ttf'),
+
+    // Inter Aliases → Quicksand
+    'Inter-Bold': require('../assets/fonts/Quicksand-Bold.ttf'),
+    'Inter-SemiBold': require('../assets/fonts/Quicksand-SemiBold.ttf'),
+    'Inter-Medium': require('../assets/fonts/Quicksand-Medium.ttf'),
+    'Inter-Regular': require('../assets/fonts/Quicksand-Regular.ttf'),
+    'Inter-Light': require('../assets/fonts/Quicksand-Light.ttf'),
+
+    // Gilroy Aliases → Quicksand
+    'Gilroy-Bold': require('../assets/fonts/Quicksand-Bold.ttf'),
+    'Gilroy-SemiBold': require('../assets/fonts/Quicksand-SemiBold.ttf'),
+    'Gilroy-Medium': require('../assets/fonts/Quicksand-Medium.ttf'),
+    'Gilroy-Regular': require('../assets/fonts/Quicksand-Regular.ttf'),
+    'Gilroy-Light': require('../assets/fonts/Quicksand-Light.ttf'),
   });
 
   useEffect(() => {
     async function checkForOTAUpdates() {
-      if (__DEV__ || Platform.OS === 'web') return
+      if (__DEV__) return
       try {
         const update = await Updates.checkForUpdateAsync()
         if (update.isAvailable) {
@@ -67,22 +78,14 @@ function RootLayout() {
     checkForOTAUpdates()
   }, [])
 
-  // Web & Mobile Loading Safety Guard: Prevent indefinite splash screen hanging
-  useEffect(() => {
-    const safetyTimer = setTimeout(() => {
-      useAuthStore.getState().setLoading(false)
-    }, 2500)
-    return () => clearTimeout(safetyTimer)
-  }, [])
-
   useEffect(() => {
     registerForPushNotificationsAsync()
     fetchBranding()
   }, [])
 
   useEffect(() => {
-    if(error) throw error;
-    if(fontsLoaded) SplashScreen.hideAsync();
+    if (error) throw error;
+    if (fontsLoaded) SplashScreen.hideAsync();
   }, [fontsLoaded, error]);
 
   useEffect(() => {
@@ -118,7 +121,12 @@ function RootLayout() {
         })
 
         // Fire native system notification (shows on phone status bar/lockscreen when app is minimized!)
-        sendLocalNotification(notifTitle, notifBody, { orderId: order.$id })
+        sendLocalNotification(notifTitle, notifBody, {
+          orderId: order.$id,
+          url: '/seller/orders',
+          targetRole: 'seller',
+          type: 'seller_order',
+        })
 
         setNotification({ title: notifTitle, body: notifBody, icon: '🏪', orderId: order.$id })
         setTimeout(() => setNotification(null), 6000)
@@ -139,7 +147,12 @@ function RootLayout() {
         })
 
         // Fire native system notification
-        sendLocalNotification(notifTitle, notifBody, { orderId: order.$id })
+        sendLocalNotification(notifTitle, notifBody, {
+          orderId: order.$id,
+          url: '/admin/orders',
+          targetRole: 'admin',
+          type: 'admin_order',
+        })
 
         setNotification({ title: notifTitle, body: notifBody, icon: '👑', orderId: order.$id })
         setTimeout(() => setNotification(null), 6000)
@@ -163,7 +176,12 @@ function RootLayout() {
         })
 
         // Fire native system notification
-        sendLocalNotification(notifTitle, notifBody, { orderId: order.$id })
+        sendLocalNotification(notifTitle, notifBody, {
+          orderId: order.$id,
+          url: `/order/${order.$id}`,
+          targetRole: 'customer',
+          type: 'order',
+        })
 
         setNotification({ title: notifTitle, body: notifBody, icon: '🥬', orderId: order.$id })
         setTimeout(() => setNotification(null), 6000)
@@ -175,9 +193,70 @@ function RootLayout() {
     }
   }, [user, role, isSeller, isAdmin, sellerStore])
 
-  const showSplash = Platform.OS !== 'web' && (!fontsLoaded || isLoading);
+  // ── NOTIFICATION RESPONSE TAP LISTENER (Background / Minimized Deep Linking) ──
+  useEffect(() => {
+    const handleNotificationResponse = (response: Notifications.NotificationResponse) => {
+      try {
+        const data = response?.notification?.request?.content?.data
+        if (!data) return
 
-  if (showSplash) {
+        const { url, orderId, targetRole, type } = data
+
+        // 1. Direct explicit URL navigation
+        if (url && typeof url === 'string') {
+          setTimeout(() => {
+            router.push(url as any)
+          }, 150)
+          return
+        }
+
+        // 2. Order ID routing based on role or targetRole
+        if (orderId && typeof orderId === 'string') {
+          setTimeout(() => {
+            if (targetRole === 'seller' || isSeller) {
+              router.push('/seller/orders' as any)
+            } else if (targetRole === 'admin' || isAdmin) {
+              router.push('/admin/orders' as any)
+            } else {
+              router.push(`/order/${orderId}` as any)
+            }
+          }, 150)
+          return
+        }
+
+        // 3. Category / Type fallback
+        setTimeout(() => {
+          if (type === 'seller_order' || isSeller) {
+            router.push('/seller/orders' as any)
+          } else if (type === 'admin_order' || isAdmin) {
+            router.push('/admin/orders' as any)
+          } else if (type === 'wallet') {
+            router.push('/wallet' as any)
+          } else {
+            router.push('/(tabs)/notifications' as any)
+          }
+        }, 150)
+      } catch (err) {
+        console.error('[NOTIFICATIONS] Deep link routing error:', err)
+      }
+    }
+
+    // A. Listen for notification tap events when app is minimized or running in background
+    const subscription = Notifications.addNotificationResponseReceivedListener(handleNotificationResponse)
+
+    // B. Check if app was cold-started directly by tapping a minimized notification
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
+        handleNotificationResponse(response)
+      }
+    })
+
+    return () => {
+      subscription.remove()
+    }
+  }, [isSeller, isAdmin])
+
+  if (!fontsLoaded || isLoading) {
     return (
       <View className="flex-1 bg-white items-center justify-center p-6">
         {appLogo ? (
@@ -197,9 +276,6 @@ function RootLayout() {
             resizeMode="contain"
           />
         )}
-        <Text className="text-black text-2xl font-bold mt-4 tracking-wide font-quicksand-bold">
-          {appName}
-        </Text>
         <ActivityIndicator size="small" color="#53B175" className="mt-6" />
       </View>
     );
@@ -262,6 +338,7 @@ function RootLayout() {
       )}
     </View>
   );
-}
+});
 
-export default Platform.OS === 'web' ? RootLayout : Sentry.wrap(RootLayout);
+
+// Sentry.showFeedbackWidget();

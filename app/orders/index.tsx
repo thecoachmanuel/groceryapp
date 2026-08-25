@@ -183,8 +183,27 @@ export default function CustomerOrdersList() {
             onPress={() => { if (item?.$id) router.push(`/order/${item.$id}` as any) }}
             className="flex-1 bg-primary/5 rounded-2xl py-2.5 items-center border-2 border-primary/10"
           >
-            <Text className="text-primary font-quicksand-bold text-xs" style={{ color: '#53B175' }}>Track Order →</Text>
+            <Text className="text-primary font-quicksand-bold text-xs" style={{ color: '#53B175' }}>
+              Track Order →
+            </Text>
           </TouchableOpacity>
+
+          {isPast && item.status === 'delivered' && !item.isRated && (
+            <TouchableOpacity
+              onPress={() => { if (item?.$id) router.push(`/order/${item.$id}` as any) }}
+              className="bg-amber-500/10 px-4 py-2.5 rounded-2xl items-center border border-amber-500/30"
+            >
+              <Text className="text-amber-700 font-quicksand-bold text-xs">⭐ Rate Store</Text>
+            </TouchableOpacity>
+          )}
+
+          {isPast && item.isRated && (
+            <View className="bg-primary/10 px-3 py-2.5 rounded-2xl items-center border border-primary/20">
+              <Text className="text-primary font-quicksand-bold text-xs" style={{ color: '#53B175' }}>
+                ⭐ {item.reviewRating || 5}/5 Rated
+              </Text>
+            </View>
+          )}
 
           {!isPast && (
             <TouchableOpacity

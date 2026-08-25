@@ -5,6 +5,7 @@ import {
   creditCustomerWallet,
   debitCustomerWallet,
   getAllCustomers,
+  getAllCustomerWalletsMap,
   getCustomerWallet,
   getWalletTransactions,
   updateCustomerBlockStatus,
@@ -54,22 +55,41 @@ export default function AdminUsersScreen() {
   const fetchUsers = async () => {
     setLoading(true)
     try {
-      const data = await getAllCustomers()
+      const [data, walletsMap] = await Promise.all([
+        getAllCustomers(),
+        getAllCustomerWalletsMap(),
+      ])
       setCustomers(data || [])
 
       if (data && data.length > 0) {
         const balances: Record<string, number> = {}
+        for (const c of data) {
+          const uId = c.accountId || c.$id
+          const altId = c.$id !== uId ? c.$id : c.accountId
+          const email = c.email
+          const matchedBal =
+            walletsMap[c.$id] ??
+            walletsMap[c.accountId] ??
+            walletsMap[email] ??
+            Number(c.walletBalance ?? c.balance ?? 0)
+
+          balances[c.$id] = matchedBal
+        }
+        setWalletMap(balances)
+
+        // Concurrently query individual wallets
         await Promise.all(
           data.map(async (c: any) => {
             try {
               const uId = c.accountId || c.$id
               const altId = c.$id !== uId ? c.$id : c.accountId
               const w = await getCustomerWallet(uId, altId, c.email)
-              if (w) balances[c.$id] = Number(w.balance) || 0
+              if (w && w.balance !== undefined) {
+                setWalletMap((prev) => ({ ...prev, [c.$id]: Number(w.balance || 0) }))
+              }
             } catch { }
           })
         )
-        setWalletMap(balances)
       }
     } catch (e) {
       console.error(e)
