@@ -5,6 +5,12 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "next/*": [
+        "./pwa/node_modules/next/*"
+      ],
+      "lucide-react": [
+        "./pwa/node_modules/lucide-react"
       ]
     }
   },
@@ -13,10 +19,12 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
-    "nativewind-env.d.ts"
+    "nativewind-env.d.ts",
+    "pwa/src/types/**/*.d.ts"
   ],
   "exclude": [
     "node_modules",
+    "pwa",
     "**/__tests__/**"
   ]
 }
