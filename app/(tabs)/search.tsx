@@ -265,7 +265,7 @@ const Search = () => {
               <MenuCard item={item} />
             </View>
           )}
-          keyExtractor={(item) => item.$id || item.id}
+          keyExtractor={(item: any) => item?.$id || item?.id || String(Math.random())}
           numColumns={2}
           columnWrapperStyle={{ justifyContent: 'space-between', paddingHorizontal: 20 }}
           contentContainerStyle={{ paddingBottom: listPaddingBottom, paddingTop: 12 }}

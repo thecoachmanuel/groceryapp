@@ -2350,41 +2350,69 @@ export const getCoupons = async () => {
 
 export const createCoupon = async (couponData: {
   code: string
-  discountType: 'flat' | 'percentage'
+  discountType: 'flat' | 'percentage' | 'free_delivery'
   discountValue: number
   minCartAmount?: number
   maxDiscountAmount?: number
   validUntil?: string
   usageLimit?: number
+  oncePerUser?: boolean
+  isFreeDelivery?: boolean
 }) => {
   try {
-    return await databases.createDocument(
-      appwriteConfig.databaseId,
-      appwriteConfig.couponsCollectionId,
-      ID.unique(),
-      {
-        code: couponData.code.toUpperCase().trim(),
-        discountType: couponData.discountType,
-        discountValue: Number(couponData.discountValue),
-        minCartAmount: couponData.minCartAmount ? Number(couponData.minCartAmount) : 0,
-        maxDiscountAmount: couponData.maxDiscountAmount ? Number(couponData.maxDiscountAmount) : 0,
-        validUntil: couponData.validUntil || '2030-12-31',
-        usageLimit: couponData.usageLimit ? Number(couponData.usageLimit) : 1000,
-        usedCount: 0,
-        isActive: true,
-      },
-    )
+    const isFreeDeliv = couponData.discountType === 'free_delivery' || couponData.isFreeDelivery === true
+    let payload: any = {
+      code: couponData.code.toUpperCase().trim(),
+      discountType: couponData.discountType,
+      discountValue: Number(couponData.discountValue || 0),
+      minCartAmount: couponData.minCartAmount ? Number(couponData.minCartAmount) : 0,
+      maxDiscountAmount: couponData.maxDiscountAmount ? Number(couponData.maxDiscountAmount) : 0,
+      validUntil: couponData.validUntil || '2030-12-31',
+      usageLimit: couponData.usageLimit ? Number(couponData.usageLimit) : 1000,
+      usedCount: 0,
+      oncePerUser: couponData.oncePerUser ?? isFreeDeliv,
+      isFreeDelivery: isFreeDeliv,
+      usedUserIds: '[]',
+      isActive: true,
+    }
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        return await databases.createDocument(
+          appwriteConfig.databaseId,
+          appwriteConfig.couponsCollectionId,
+          ID.unique(),
+          payload,
+        )
+      } catch (err: any) {
+        const errMsg = err?.message || ''
+        const match = errMsg.match(/Unknown attribute:\s*"([^"]+)"/i)
+        if (match && match[1]) {
+          const badKey = match[1]
+          console.warn(`[createCoupon] Stripping unknown attribute "${badKey}"`)
+          delete payload[badKey]
+          continue
+        }
+        throw err
+      }
+    }
   } catch (e: any) {
     throw new Error(e.message || String(e))
   }
 }
 
-export const validateAndApplyCoupon = async (code: string, cartTotal: number) => {
+export const validateAndApplyCoupon = async (
+  code: string,
+  cartTotal: number,
+  deliveryFee = 0,
+  userId?: string,
+) => {
   try {
+    const cleanCode = code.toUpperCase().trim()
     const docs = await databases.listDocuments(
       appwriteConfig.databaseId,
       appwriteConfig.couponsCollectionId,
-      [Query.equal('code', code.toUpperCase().trim()), Query.equal('isActive', true)],
+      [Query.equal('code', cleanCode), Query.equal('isActive', true)],
     )
 
     if (!docs || docs.documents.length === 0) {
@@ -2393,18 +2421,58 @@ export const validateAndApplyCoupon = async (code: string, cartTotal: number) =>
 
     const coupon: any = docs.documents[0]
 
+    // 1. Minimum cart total check
     if (coupon.minCartAmount && cartTotal < coupon.minCartAmount) {
-      throw new Error(`Minimum cart total of ₦${coupon.minCartAmount} required for coupon "${code.toUpperCase()}".`)
+      throw new Error(`Minimum cart total of ₦${coupon.minCartAmount} required for coupon "${cleanCode}".`)
     }
 
-    if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) {
-      throw new Error(`Coupon "${code.toUpperCase()}" usage limit has been reached.`)
+    // 2. Global total usage limit check
+    if (coupon.usageLimit && (coupon.usedCount || 0) >= coupon.usageLimit) {
+      throw new Error(`Coupon "${cleanCode}" total usage limit has been reached.`)
     }
 
+    // 3. Once Per User check (oncePerUser === true or perUserLimit === 1 or discountType === 'free_delivery')
+    const isOncePerUser = coupon.oncePerUser === true || coupon.perUserLimit === 1 || coupon.discountType === 'free_delivery' || coupon.isFreeDelivery === true
+
+    if (isOncePerUser && userId) {
+      // Server-side check: check usedUserIds array / string
+      let usedUsersList: string[] = []
+      if (Array.isArray(coupon.usedUserIds)) {
+        usedUsersList = coupon.usedUserIds
+      } else if (typeof coupon.usedUserIds === 'string' && coupon.usedUserIds.trim()) {
+        try {
+          usedUsersList = JSON.parse(coupon.usedUserIds)
+        } catch {
+          usedUsersList = coupon.usedUserIds.split(',')
+        }
+      }
+
+      const hasUsedInServer = usedUsersList.includes(userId)
+
+      // Client-side double safeguard: check AsyncStorage
+      let hasUsedInStorage = false
+      try {
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default
+        const val = await AsyncStorage.getItem(`@used_coupon_${userId}_${cleanCode}`)
+        if (val === 'true') hasUsedInStorage = true
+      } catch {}
+
+      if (hasUsedInServer || hasUsedInStorage) {
+        throw new Error(`You have already redeemed promo code "${cleanCode}". This coupon is limited to 1 use per customer.`)
+      }
+    }
+
+    // 4. Calculate Discount
     let calculatedDiscount = 0
-    if (coupon.discountType === 'flat') {
+    const isFreeDeliveryCoupon = coupon.discountType === 'free_delivery' || coupon.isFreeDelivery === true
+
+    if (isFreeDeliveryCoupon) {
+      // 100% discount on delivery fee!
+      calculatedDiscount = deliveryFee > 0 ? deliveryFee : (coupon.discountValue || 0)
+    } else if (coupon.discountType === 'flat') {
       calculatedDiscount = coupon.discountValue
     } else {
+      // percentage
       calculatedDiscount = (cartTotal * coupon.discountValue) / 100
       if (coupon.maxDiscountAmount && calculatedDiscount > coupon.maxDiscountAmount) {
         calculatedDiscount = coupon.maxDiscountAmount
@@ -2415,9 +2483,80 @@ export const validateAndApplyCoupon = async (code: string, cartTotal: number) =>
       coupon,
       discountAmount: calculatedDiscount,
       finalTotal: Math.max(0, cartTotal - calculatedDiscount),
+      isFreeDelivery: isFreeDeliveryCoupon,
     }
   } catch (e: any) {
     throw new Error(e.message || String(e))
+  }
+}
+
+export const recordCouponUsage = async (couponId: string, code: string, userId?: string) => {
+  if (!couponId) return
+  try {
+    const cleanCode = code.toUpperCase().trim()
+
+    // 1. Save to AsyncStorage locally for instant client safeguard
+    if (userId) {
+      try {
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default
+        await AsyncStorage.setItem(`@used_coupon_${userId}_${cleanCode}`, 'true')
+      } catch {}
+    }
+
+    // 2. Fetch current coupon document from Appwrite to update count & user list
+    try {
+      const currentDoc: any = await databases.getDocument(
+        appwriteConfig.databaseId,
+        appwriteConfig.couponsCollectionId,
+        couponId
+      )
+
+      const currentUsedCount = (currentDoc.usedCount || 0) + 1
+
+      let userList: string[] = []
+      if (Array.isArray(currentDoc.usedUserIds)) {
+        userList = currentDoc.usedUserIds
+      } else if (typeof currentDoc.usedUserIds === 'string' && currentDoc.usedUserIds.trim()) {
+        try {
+          userList = JSON.parse(currentDoc.usedUserIds)
+        } catch {
+          userList = currentDoc.usedUserIds.split(',')
+        }
+      }
+
+      if (userId && !userList.includes(userId)) {
+        userList.push(userId)
+      }
+
+      let payload: any = {
+        usedCount: currentUsedCount,
+        usedUserIds: JSON.stringify(userList),
+      }
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          await databases.updateDocument(
+            appwriteConfig.databaseId,
+            appwriteConfig.couponsCollectionId,
+            couponId,
+            payload
+          )
+          break
+        } catch (err: any) {
+          const errMsg = err?.message || ''
+          const match = errMsg.match(/Unknown attribute:\s*"([^"]+)"/i)
+          if (match && match[1]) {
+            delete payload[match[1]]
+            continue
+          }
+          break
+        }
+      }
+    } catch (dbErr) {
+      console.warn('[recordCouponUsage] Appwrite update warning:', dbErr)
+    }
+  } catch (err) {
+    console.error('[recordCouponUsage] Error recording usage:', err)
   }
 }
 

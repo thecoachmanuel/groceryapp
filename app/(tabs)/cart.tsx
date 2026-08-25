@@ -19,6 +19,7 @@ import {
   sortStoresByProximity,
   updateUserProfile,
   validateAndApplyCoupon,
+  recordCouponUsage,
 } from '@/lib/appwrite'
 import useAuthStore from '@/store/auth.store'
 import { useCartStore } from '@/store/cart.store'
@@ -294,10 +295,22 @@ const Cart = () => {
     }
     try {
       setCouponLoading(true)
-      const result = await validateAndApplyCoupon(couponCodeInput.trim(), totalPrice + actualDeliveryFee)
+      const currentUserId = user?.$id || (user as any)?.accountId
+      const result = await validateAndApplyCoupon(
+        couponCodeInput.trim(),
+        totalPrice,
+        actualDeliveryFee,
+        currentUserId
+      )
       setAppliedCoupon(result.coupon)
       setCouponDiscount(result.discountAmount)
-      Alert.alert('Coupon Applied! 🎉', `Saved ₦${result.discountAmount.toFixed(2)} on your order!`)
+      const isFreeDeliv = result.isFreeDelivery || result.coupon?.discountType === 'free_delivery' || result.coupon?.isFreeDelivery === true
+      Alert.alert(
+        'Coupon Applied! 🎉',
+        isFreeDeliv
+          ? `Free Delivery Coupon Applied! Saved ₦${result.discountAmount.toFixed(2)} on delivery fee!`
+          : `Saved ₦${result.discountAmount.toFixed(2)} on your order!`
+      )
     } catch (err: any) {
       Alert.alert('Coupon Error', err.message || 'Could not apply coupon code.')
     } finally {
@@ -614,6 +627,14 @@ const Cart = () => {
             deliveryFee: perStoreDeliveryFee,
           })
           createdOrders.push(order)
+        }
+      }
+
+      if (appliedCoupon && (appliedCoupon.$id || appliedCoupon.id)) {
+        try {
+          await recordCouponUsage(appliedCoupon.$id || appliedCoupon.id, appliedCoupon.code, userId)
+        } catch (couponRecErr) {
+          console.warn('[CART] Error recording coupon usage:', couponRecErr)
         }
       }
 
