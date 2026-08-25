@@ -1,11 +1,13 @@
 import { images } from '@/constants'
-import React, { useRef } from 'react'
+import React, { useRef, useState, useEffect, useMemo } from 'react'
 import { ActivityIndicator, Image, Text, TextInput, TouchableOpacity, View, Platform } from 'react-native'
 
 interface SearchBarProps {
   value?: string
   onChangeText?: (text: string) => void
   placeholder?: string
+  placeholderPrefix?: string
+  placeholderWords?: string[]
   isLoading?: boolean
 }
 
@@ -13,9 +15,33 @@ const Searchbar = ({
   value = '',
   onChangeText,
   placeholder = "Search fresh groceries, fruits, milk...",
+  placeholderPrefix = '',
+  placeholderWords = [],
   isLoading = false,
 }: SearchBarProps) => {
   const inputRef = useRef<TextInput>(null)
+  const [wordIndex, setWordIndex] = useState(0)
+
+  useEffect(() => {
+    if (!placeholderWords || placeholderWords.length === 0) return
+
+    const interval = setInterval(() => {
+      setWordIndex((prev) => (prev + 1) % placeholderWords.length)
+    }, 2000)
+
+    return () => clearInterval(interval)
+  }, [placeholderWords])
+
+  const dynamicPlaceholder = useMemo(() => {
+    if (placeholderWords && placeholderWords.length > 0) {
+      const word = placeholderWords[wordIndex % placeholderWords.length]
+      if (word.toLowerCase().startsWith('search ')) {
+        return `${word}...`
+      }
+      return `${placeholderPrefix}${word}...`
+    }
+    return placeholder
+  }, [placeholder, placeholderPrefix, placeholderWords, wordIndex])
 
   const handleClear = () => {
     if (onChangeText) {
@@ -48,7 +74,7 @@ const Searchbar = ({
       <TextInput
         ref={inputRef}
         className="flex-1 py-3 text-dark-100 font-quicksand-semibold text-sm"
-        placeholder={placeholder}
+        placeholder={dynamicPlaceholder}
         value={value}
         onChangeText={onChangeText}
         placeholderTextColor="#A0A0A0"

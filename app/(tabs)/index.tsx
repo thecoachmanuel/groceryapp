@@ -442,7 +442,7 @@ export default function Index() {
                   <Searchbar
                     value={homeSearchQuery}
                     onChangeText={handleHomeSearchChange}
-                    placeholder="Search fresh groceries, fruits, stores..."
+                    placeholderWords={['search fresh groceries', 'search fresh fruits', 'search fresh vegetables', 'search verified stores']}
                     isLoading={searchingLive}
                   />
                 </View>
